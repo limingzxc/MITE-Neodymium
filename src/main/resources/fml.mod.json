@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "neodymium",
+  "version": "${version}",
+  "depends": {
+    "fishmodloader": ">=3.0.0"
+  },
+  "environment": "*",
+  "name": "Neodymium",
+  "description": "",
+  "authors": [
+    "Makamys",
+    "Arminias",
+    "Debris"
+  ],
+  "entrypoints": {
+    "main": [
+      "makamys.neodymium.Neodymium"
+    ],
+    "preLaunch": [
+      "makamys.neodymium.Neodymium"
+    ]
+  },
+  "mixins": [
+    "Neodymium.mixins.json"
+  ],
+  "accessWidener": "Neodymium.accesswidener",
+  "custom": {
+    "loom:injected_interfaces": {
+    }
+  }
+}

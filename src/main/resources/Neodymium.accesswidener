@@ -1,0 +1,6 @@
+accessWidener v2 named
+
+extendable class net/minecraft/WorldRenderer
+accessible field net/minecraft/WorldRenderer posX I
+accessible field net/minecraft/WorldRenderer posY I
+accessible field net/minecraft/WorldRenderer posZ I
