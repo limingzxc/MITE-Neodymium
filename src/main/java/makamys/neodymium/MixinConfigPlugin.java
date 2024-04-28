@@ -10,19 +10,19 @@ import org.spongepowered.asm.mixin.MixinEnvironment.Phase;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
-import makamys.neodymium.config.Config;
+import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.util.OFUtil;
 
 public class MixinConfigPlugin implements IMixinConfigPlugin {
     
     @Override
     public void onLoad(String mixinPackage) {
-        Config.reloadConfig();
-        
-        Phase phase = MixinEnvironment.getCurrentEnvironment().getPhase();
-        if(phase == Phase.INIT) {
-            Compat.forceEnableOptiFineDetectionOfFastCraft();
-        }
+//        NeodymiumConfig.reloadConfig();
+//
+//        Phase phase = MixinEnvironment.getCurrentEnvironment().getPhase();
+//        if(phase == Phase.INIT) {
+//            Compat.forceEnableOptiFineDetectionOfFastCraft();
+//        }
     }
 
     @Override
@@ -46,7 +46,7 @@ public class MixinConfigPlugin implements IMixinConfigPlugin {
             mixins.addAll(Arrays.asList(
                 "MixinRenderGlobal",
                 "MixinWorldRenderer",
-                "MixinTessellator"));
+                "MixinTessellatorMITE"));
                 
             if (OFUtil.isOptiFinePresent()) {
                 System.out.println("Detected OptiFine");
@@ -54,7 +54,7 @@ public class MixinConfigPlugin implements IMixinConfigPlugin {
                 mixins.add("MixinGameSettings_OptiFine");
             }
             
-            if(Config.replaceOpenGLSplash) {
+            if(NeodymiumConfig.replaceOpenGLSplash.getBooleanValue()) {
                 mixins.add("MixinGuiMainMenu");
             }
         }

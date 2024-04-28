@@ -10,12 +10,11 @@ import java.util.Map;
 import makamys.neodymium.mixin.PlayerUsageSnooperAccessor;
 //import net.fabricmc.loader.gui.FabricGuiEntry;
 //import net.fabricmc.loader.launch.common.FabricLauncherBase;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.GameSettings;
 import net.xiaoyu233.fml.FishModLoader;
 import org.lwjgl.opengl.GLContext;
 
-import makamys.neodymium.config.Config;
+import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.util.virtualjar.IVirtualJar;
 import makamys.neodymium.util.virtualjar.VirtualJar;
 import net.minecraft.Minecraft;
@@ -110,7 +109,7 @@ public class Compat {
     }
     
     private static boolean detectedNotEnoughVRAM() {
-        return Config.VRAMSize == notEnoughVRAMAmountMB;
+        return NeodymiumConfig.VRAMSize.getIntegerValue() == notEnoughVRAMAmountMB;
     }
 
     public static void forceEnableOptiFineDetectionOfFastCraft() {

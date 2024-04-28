@@ -1,19 +1,17 @@
 package makamys.neodymium.renderer;
 
-import static org.lwjgl.opengl.GL15.*;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import makamys.neodymium.Compat;
 import makamys.neodymium.Neodymium;
-import makamys.neodymium.config.Config;
+import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.renderer.Mesh.GPUStatus;
-import makamys.neodymium.util.GuiHelper;
 import makamys.neodymium.util.ChatUtil;
+import makamys.neodymium.util.GuiHelper;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static makamys.neodymium.Constants.LOGGER;
+import static org.lwjgl.opengl.GL15.*;
 
 /** Manages dynamic memory allocation inside a fixed buffer on the GPU. */
 public class GPUMemoryManager {
@@ -36,7 +34,7 @@ public class GPUMemoryManager {
     public GPUMemoryManager() {
         VBO = glGenBuffers();
         
-        bufferSize = ((long)Config.VRAMSize) * 1024 * 1024;
+        bufferSize = ((long) NeodymiumConfig.VRAMSize.getIntegerValue()) * 1024 * 1024;
         
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         
@@ -111,7 +109,7 @@ public class GPUMemoryManager {
             
             if(lastVRAMFullness != -1 && t - lastVRAMFullness < MAX_VRAM_FULLNESS_INTERVAL) {
                 ChatUtil.showNeoChatMessage("VRAM keeps getting full! Reverting to vanilla renderer. Try increasing the VRAM buffer size in the config, if possible.", ChatUtil.MessageVerbosity.ERROR, false);
-                Compat.onNotEnoughVRAM(Config.VRAMSize);
+                Compat.onNotEnoughVRAM(NeodymiumConfig.VRAMSize.getIntegerValue());
             } else {
                 LOGGER.debug("Reloading renderer because VRAM is full.");
                 // TODO restart renderer with more VRAM allocated when this happens.

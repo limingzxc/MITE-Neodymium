@@ -28,7 +28,7 @@ public class EntityRendererMixin {
     }
 
     @Redirect(method = "renderWorld",
-            at = @At(value = "INVOKE", target = "Lorg/lwjgl/opengl/GL11;glColorMask(ZZZZ)V", ordinal = 0),
+            at = @At(value = "INVOKE", target = "Lorg/lwjgl/opengl/GL11;glColorMask(ZZZZ)V",ordinal = 0),
             slice = @Slice(from = @At(value = "INVOKE", target = "Lorg/lwjgl/opengl/GL11;glShadeModel(I)V", ordinal = 2)))
     private void glColorMaskMixin(boolean red, boolean green, boolean blue, boolean alpha) {
         GL11.glEnable(GL11.GL_BLEND);

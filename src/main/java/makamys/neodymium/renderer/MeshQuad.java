@@ -8,7 +8,7 @@ import java.util.Locale;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.vector.Vector3f;
 
-import makamys.neodymium.config.Config;
+import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.util.BufferWriter;
 import makamys.neodymium.util.Util;
 
@@ -171,7 +171,7 @@ public class MeshQuad {
             float u = us[vertexI];
             float v = vs[vertexI];
             
-            if(Config.shortUV) {
+            if(NeodymiumConfig.shortUV.getBooleanValue()) {
                 out.writeShort((short)(Math.round(u * 32768f)));
                 out.writeShort((short)(Math.round(v * 32768f)));
             } else {
@@ -187,7 +187,7 @@ public class MeshQuad {
             
             out.writeInt(c);
             
-            if(Config.simplifyChunkMeshes) {
+            if(NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
                 if((quadCountByUVDirection(false) == 1 && quadCountByUVDirection(true) == 1)) {
                     // let the fragment shader know this is not a megaquad
                     out.writeByte((byte)255);
@@ -219,10 +219,10 @@ public class MeshQuad {
     public static int getStride() {
         return
                 3 * 4                                       // XYZ          (float)
-                + 2 * (Config.shortUV ? 2 : 4)              // UV           (float)
+                + 2 * (NeodymiumConfig.shortUV.getBooleanValue() ? 2 : 4)              // UV           (float)
                 + 4                                         // B            (int)
                 + 4                                         // C            (int)
-                + (Config.simplifyChunkMeshes ? 4 : 0)      // megaquad XY  (byte)
+                + (NeodymiumConfig.simplifyChunkMeshes.getBooleanValue() ? 4 : 0)      // megaquad XY  (byte)
                 ;
     }
     

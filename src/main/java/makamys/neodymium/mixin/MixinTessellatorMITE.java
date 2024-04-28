@@ -1,6 +1,6 @@
 package makamys.neodymium.mixin;
 
-import makamys.neodymium.config.Config;
+import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.ducks.ITessellator;
 import makamys.neodymium.renderer.ChunkMesh;
 import net.minecraft.Tessellator;
@@ -20,9 +20,9 @@ abstract class MixinTessellatorMITE extends Tessellator implements ITessellator 
     @Inject(method = "draw", at = @At(value = "HEAD"), cancellable = true)
     private void preDraw(CallbackInfoReturnable<Integer> cir) {
         if(nd$captureMeshes) {
-            ChunkMesh.preTessellatorDraw((Tessellator)(Object)this);
+            ChunkMesh.preTessellatorDraw(this);
             
-            if(Config.enabled && !Config.enableVanillaChunkMeshes) {
+            if(NeodymiumConfig.enabled.getBooleanValue() && !NeodymiumConfig.enableVanillaChunkMeshes.getBooleanValue()) {
                 isDrawing = false;
                 reset();
                 cir.setReturnValue(0);

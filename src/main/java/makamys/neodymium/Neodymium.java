@@ -7,17 +7,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import makamys.neodymium.mixin.ServerConfigurationManagerAccessor;
+import fi.dy.masa.malilib.gui.screen.ModsScreen;
+import makamys.neodymium.config.NeodymiumConfig;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint;
-import net.minecraft.CommandHandler;
 import net.minecraft.World;
 import net.minecraft.EntityPlayer;
 
 
 import makamys.neodymium.Compat.Warning;
 import makamys.neodymium.command.NeodymiumCommand;
-import makamys.neodymium.config.Config;
 import makamys.neodymium.renderer.NeoRenderer;
 import makamys.neodymium.util.ChatUtil;
 import makamys.neodymium.util.WarningHelper;
@@ -27,7 +26,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
 {
     public static Neodymium instance = new Neodymium();
     
-    private static final Config.ReloadInfo CONFIG_RELOAD_INFO = new Config.ReloadInfo();
+    public static final NeodymiumConfig.ReloadInfo CONFIG_RELOAD_INFO = new NeodymiumConfig.ReloadInfo();
 
     private static Map<String, Object> properties;
     private boolean renderDebugText = false;
@@ -64,23 +63,23 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     /*@SubscribeEvent
     public void onConfigChanged(ConfigChangedEvent event) {
         if(event.modID.equals(MODID)) {
-            Config.flush();
+            NeodymiumConfig.flush();
         }
     }*/
     
     private void onPlayerWorldChanged(World newWorld) {
     	if(getRendererWorld() == null && newWorld != null) {
-    		Config.reloadConfig();
+    		NeodymiumConfig.getInstance().load();
     	}
     	if(renderer != null) {
             destroyRenderer();
         }
-    	if(Config.enabled && newWorld != null) {
+    	if(NeodymiumConfig.enabled.getBooleanValue() && newWorld != null) {
     	    Pair<List<Warning>, List<Warning>> warnsAndCriticalWarns = showCompatStatus(false);
     	    List<Warning> warns = warnsAndCriticalWarns.getLeft();
     	    List<Warning> criticalWarns = warnsAndCriticalWarns.getRight();
     	    
-    	    if(criticalWarns.isEmpty() || Config.ignoreIncompatibilities) {
+    	    if(criticalWarns.isEmpty() || NeodymiumConfig.ignoreIncompatibilities.getBooleanValue()) {
     	        renderer = new NeoRenderer(newWorld);
     	        renderer.hasIncompatibilities = !warns.isEmpty() || !criticalWarns.isEmpty();
     	    }
@@ -91,7 +90,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     /*@SubscribeEvent
     @SideOnly(Side.CLIENT)
     public void onWorldUnload(WorldEvent.Unload event) {
-        if(!Config.enabled) return;
+        if(!NeodymiumConfig.enabled) return;
         
         if(event.world == getRendererWorld()) {
         	onPlayerWorldChanged(null);
@@ -99,7 +98,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     }*/
 
     public void onWorldUnload(World world) {
-        if(!Config.enabled) return;
+        if(!NeodymiumConfig.enabled.getBooleanValue()) return;
 
         if(world == getRendererWorld()) {
             onPlayerWorldChanged(null);
@@ -109,14 +108,14 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     /*@SubscribeEvent
     @SideOnly(Side.CLIENT)
     public void onConnectToServer(ClientConnectedToServerEvent event) {
-        Config.reloadConfig();
+        NeodymiumConfig.reloadConfig();
         ChatUtil.resetShownChatMessages();
         Compat.reset();
         WarningHelper.reset();
     }*/
 
     public void onConnectToServer() {
-        Config.reloadConfig();
+        NeodymiumConfig.getInstance().load();
         ChatUtil.resetShownChatMessages();
         Compat.reset();
         WarningHelper.reset();
@@ -132,11 +131,11 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     
     /*@SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
-        if(!Config.enabled) return;
+        if(!NeodymiumConfig.enabled) return;
         
     	if(event.phase == TickEvent.Phase.START && isActive()) {
-    	    if(Config.hotswap) {
-    	        if(Config.reloadIfChanged(CONFIG_RELOAD_INFO)) {
+    	    if(NeodymiumConfig.hotswap) {
+    	        if(NeodymiumConfig.reloadIfChanged(CONFIG_RELOAD_INFO)) {
     	            if(CONFIG_RELOAD_INFO.needReload) {
     	                Minecraft.getMinecraft().renderGlobal.loadRenderers();
     	            } else if(renderer != null) {
@@ -157,12 +156,13 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     }*/
 
     public void onClientTick() {
-        if(!Config.enabled) return;
+        if(!NeodymiumConfig.enabled.getBooleanValue()) return;
         if(isActive()) {
-            if(Config.hotswap) {
-                if(Config.reloadIfChanged(CONFIG_RELOAD_INFO)) {
+            if(NeodymiumConfig.hotswap.getBooleanValue()) {
+                if(NeodymiumConfig.reloadIfChanged(CONFIG_RELOAD_INFO)) {
                     if(CONFIG_RELOAD_INFO.needReload) {
                         Minecraft.getMinecraft().renderGlobal.loadRenderers();
+                        CONFIG_RELOAD_INFO.needReload = false;
                     } else if(renderer != null) {
                         renderer.reloadShader();
                     }
@@ -184,7 +184,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     
     /*@SubscribeEvent
     public void onRenderTick(TickEvent.RenderTickEvent event) {
-        if(!Config.enabled) return;
+        if(!NeodymiumConfig.enabled) return;
         
         if(event.phase == TickEvent.Phase.START) {
             EntityPlayer player = Minecraft.getMinecraft().thePlayer;
@@ -204,7 +204,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     }*/
 
     public void onRenderTick(Phase phase) {
-        if(!Config.enabled)
+        if(!NeodymiumConfig.enabled.getBooleanValue())
             return;
 
         if(phase == Phase.START) {
@@ -226,7 +226,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
 
     /*@SubscribeEvent
     public void onRenderOverlay(RenderGameOverlayEvent.Pre event) {
-        if (Config.showDebugInfo && isActive()) {
+        if (NeodymiumConfig.showDebugInfo && isActive()) {
             if (event.type.equals(RenderGameOverlayEvent.ElementType.DEBUG)) {
                 renderDebugText = true;
             } else if (renderDebugText && (event instanceof RenderGameOverlayEvent.Text) && event.type.equals(RenderGameOverlayEvent.ElementType.TEXT)) {
@@ -239,7 +239,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     }*/
 
     public String onRenderOverlay(ElementType type, String text) {
-        if (Config.showDebugInfo && isActive()) {
+        if (NeodymiumConfig.showDebugInfo.getBooleanValue() && isActive()) {
             if (type.equals(ElementType.DEBUG)) {
                 renderDebugText = true;
             } else if (renderDebugText && type.equals(ElementType.TEXT)) {
@@ -289,7 +289,7 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
         
         Compat.getCompatibilityWarnings(warns, criticalWarns, statusCommand);
         
-        if(!criticalWarns.isEmpty() && !Config.ignoreIncompatibilities) {
+        if(!criticalWarns.isEmpty() && !NeodymiumConfig.ignoreIncompatibilities.getBooleanValue()) {
             criticalWarns.add(new Warning("Neodymium has been disabled due to a critical incompatibility."));
         }
         
@@ -306,6 +306,9 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     @Override
     public void onInitialize() {
         NeodymiumCommand.init();
+        NeodymiumConfig.init();
+        NeodymiumConfig.getInstance().load();
+        ModsScreen.getInstance().addConfig(NeodymiumConfig.getInstance());
     }
 
     @Override

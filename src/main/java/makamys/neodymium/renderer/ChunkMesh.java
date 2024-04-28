@@ -10,11 +10,11 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.mixin.TessellatorAccessor;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
-import makamys.neodymium.config.Config;
 import makamys.neodymium.ducks.IWorldRenderer;
 import makamys.neodymium.util.BufferWriter;
 import makamys.neodymium.util.RecyclingList;
@@ -116,7 +116,7 @@ public class ChunkMesh extends Mesh {
         if(!quadBuf.isEmpty()) {
             // Only show errors if we're actually supposed to be drawing something
             if(!errors.isEmpty() || !warnings.isEmpty()) {
-                if(!Config.silenceErrors) {
+                if(!NeodymiumConfig.silenceErrors.getBooleanValue()) {
                     String dimId = wr.worldObj != null && wr.worldObj.provider != null ? "" + wr.worldObj.provider.dimensionId : "UNKNOWN";
                     if(!errors.isEmpty()) {
                         LOGGER.error("Errors in chunk ({}, {}, {}) in dimension {}:", x, y, z, dimId);
@@ -151,7 +151,7 @@ public class ChunkMesh extends Mesh {
     public void finishConstruction() {
         List<MeshQuad> quads = quadBuf.getAsList();
         
-        if(Config.simplifyChunkMeshes) {
+        if(NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
             ArrayList<ArrayList<MeshQuad>> quadsByPlaneDir = new ArrayList<>(); // XY, XZ, YZ
             for(int i = 0; i < 3; i++) {
                 quadsByPlaneDir.add(new ArrayList<>());
@@ -309,7 +309,7 @@ public class ChunkMesh extends Mesh {
     
     @Override
     public int writeToIndexBuffer(IntBuffer piFirst, IntBuffer piCount, int cameraXDiv, int cameraYDiv, int cameraZDiv, int pass) {
-        if(!Config.cullFaces) {
+        if(!NeodymiumConfig.cullFaces.getBooleanValue()) {
             return super.writeToIndexBuffer(piFirst, piCount, cameraXDiv, cameraYDiv, cameraZDiv, pass);
         }
         
@@ -346,8 +346,8 @@ public class ChunkMesh extends Mesh {
             case NEGATIVE_Y -> interpYDiv < ((y + 1));
             case POSITIVE_Z -> interpZDiv >= ((z));
             case NEGATIVE_Z -> interpZDiv < ((z + 1));
-            default -> pass != 0 || Config.maxUnalignedQuadDistance == Integer.MAX_VALUE
-                    || Util.distSq(interpXDiv, interpYDiv, interpZDiv, x, y, z) < Math.pow(Config.maxUnalignedQuadDistance, 2);
+            default -> pass != 0 || NeodymiumConfig.maxUnalignedQuadDistance.getIntegerValue() == Integer.MAX_VALUE
+                    || Util.distSq(interpXDiv, interpYDiv, interpZDiv, x, y, z) < Math.pow(NeodymiumConfig.maxUnalignedQuadDistance.getIntegerValue(), 2);
         };
     }
     

@@ -6,9 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import makamys.neodymium.config.Config;
 import net.minecraft.*;
-import net.minecraft.server.MinecraftServer;
 import net.xiaoyu233.fml.FishModLoader;
 import org.lwjgl.input.Mouse;
 
@@ -31,7 +29,7 @@ public class NeodymiumCommand extends CommandBase {
     public static void init() {
 //        ClientCommandHandler.instance.registerCommand(new NeodymiumCommand());
         if (!FishModLoader.isServer()) {
-//            Config.instance.registerAddonCommand(new NeodymiumCommand());
+//            NeodymiumConfig.instance.registerAddonCommand(new NeodymiumCommand());
             registerSubCommand("status", new StatusCommand());
             registerSubCommand("disable_advanced_opengl", new DisableAdvancedOpenGLCommand());
         }

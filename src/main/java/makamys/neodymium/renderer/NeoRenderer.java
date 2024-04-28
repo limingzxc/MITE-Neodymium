@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.mixin.NetClientHandlerAccessor;
 import makamys.neodymium.mixin.PlayerControllerMPAccessor;
 import org.lwjgl.BufferUtils;
@@ -30,7 +31,6 @@ import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector4f;
 
 import makamys.neodymium.Neodymium;
-import makamys.neodymium.config.Config;
 import makamys.neodymium.ducks.IWorldRenderer;
 import makamys.neodymium.renderer.Mesh.GPUStatus;
 import makamys.neodymium.util.CheatHelper;
@@ -127,7 +127,8 @@ public class NeoRenderer {
                     Entity rve = Minecraft.getMinecraft().renderViewEntity;
                     
                     eyePosX = rve.lastTickPosX + (rve.posX - rve.lastTickPosX) * alpha;
-                    eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + rve.getEyeHeight();
+                    // eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + rve.getEyeHeight();
+                    eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + 0.12F;
                     eyePosZ = rve.lastTickPosZ + (rve.posZ - rve.lastTickPosZ) * alpha;
                     
                     eyePosXT = eyePosX + transformedOrigin.x;
@@ -138,7 +139,7 @@ public class NeoRenderer {
                     eyePosYTDiv = Math.floorDiv((int)Math.floor(eyePosYT), 16);
                     eyePosZTDiv = Math.floorDiv((int)Math.floor(eyePosZT), 16);
                     
-                    sort(frameCount % 100 == 0, frameCount % Config.sortFrequency == 0);
+                    sort(frameCount % 100 == 0, frameCount % NeodymiumConfig.sortFrequency.getIntegerValue() == 0);
                     
                     updateMeshes();
                     initIndexBuffers();
@@ -212,9 +213,9 @@ public class NeoRenderer {
     }
     
     private boolean shouldRenderMesh(Mesh mesh) {
-        if((Config.maxMeshesPerFrame == -1 || renderedMeshes < Config.maxMeshesPerFrame)) {
-            return (!isFogEnabled() && !Config.fogOcclusionWithoutFog)
-                    || Config.fogOcclusion == !Config.fogOcclusion
+        if((NeodymiumConfig.maxMeshesPerFrame.getIntegerValue() == -1 || renderedMeshes < NeodymiumConfig.maxMeshesPerFrame.getIntegerValue())) {
+            return (!isFogEnabled() && !NeodymiumConfig.fogOcclusionWithoutFog.getBooleanValue())
+                    || NeodymiumConfig.fogOcclusion.getBooleanValue() == !NeodymiumConfig.fogOcclusion.getBooleanValue()
                     || mesh.distSq(
                     eyePosX / 16.0,
                     mesh.y + 0.5,
@@ -241,7 +242,7 @@ public class NeoRenderer {
     }
     
     private void handleKeyboard() {
-        if (Config.debugPrefix == 0 || (Config.debugPrefix != -1 && Keyboard.isKeyDown(Config.debugPrefix))) {
+        if (NeodymiumConfig.debugPrefix.getHotkey() == 0 || (NeodymiumConfig.debugPrefix.getHotkey() != -1 && Keyboard.isKeyDown(NeodymiumConfig.debugPrefix.getHotkey()))) {
             if (CheatHelper.canCheat()) {
                 if (Keyboard.isKeyDown(Keyboard.KEY_F) && !wasDown[Keyboard.KEY_F]) {
                     rendererActive = !rendererActive;
@@ -371,7 +372,7 @@ public class NeoRenderer {
     public boolean init() {
         // The average mesh is 60 KB. Let's be safe and assume 8 KB per mesh.
         // This means 1 MB of index data per 512 MB of VRAM.
-        MAX_MESHES = Config.VRAMSize * 128;
+        MAX_MESHES = NeodymiumConfig.VRAMSize.getIntegerValue() * 128;
         
         reloadShader();
         
@@ -385,11 +386,11 @@ public class NeoRenderer {
         int stride = MeshQuad.getStride();
         
         glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0);
-        glVertexAttribPointer(1, 2, Config.shortUV ? GL_UNSIGNED_SHORT : GL_FLOAT, false, stride, 3 * 4);
-        int uvEnd = Config.shortUV ? 4 * 4 : 5 * 4;
+        glVertexAttribPointer(1, 2, NeodymiumConfig.shortUV.getBooleanValue() ? GL_UNSIGNED_SHORT : GL_FLOAT, false, stride, 3 * 4);
+        int uvEnd = NeodymiumConfig.shortUV.getBooleanValue() ? 4 * 4 : 5 * 4;
         glVertexAttribPointer(2, 2, GL_SHORT, false, stride, uvEnd);
         glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, false, stride, uvEnd + 4);
-        if (Config.simplifyChunkMeshes) {
+        if (NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
             glVertexAttribPointer(4, 4, GL_UNSIGNED_BYTE, false, stride, uvEnd + 2 * 4);
         }
         
@@ -397,7 +398,7 @@ public class NeoRenderer {
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
         glEnableVertexAttribArray(3);
-        if (Config.simplifyChunkMeshes) {
+        if (NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
             glEnableVertexAttribArray(4);
         }
         
@@ -420,10 +421,10 @@ public class NeoRenderer {
             if (hasFog == 1) {
                 defines.add("RENDER_FOG");
             }
-            if(Config.simplifyChunkMeshes) {
+            if(NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
                 defines.add("SIMPLIFY_MESHES");
             }
-            if (Config.shortUV) {
+            if (NeodymiumConfig.shortUV.getBooleanValue()) {
                 defines.add("SHORT_UV");
             }
             if (pass == 0) {
@@ -621,11 +622,12 @@ public class NeoRenderer {
     }
     
     private static boolean isFogEnabled() {
-        return switch (Config.renderFog) {
-            case TRUE -> true;
-            case FALSE -> false;
-            default -> GL11.glIsEnabled(GL11.GL_FOG) && !OFUtil.isFogOff();
-        };
+        return NeodymiumConfig.renderFog.getBooleanValue();
+//        return switch (NeodymiumConfig.renderFog) {
+//            case TRUE -> true;
+//            case FALSE -> false;
+//            default -> GL11.glIsEnabled(GL11.GL_FOG) && !OFUtil.isFogOff();
+//        };
     }
     
     private boolean shouldRenderInWorld(World world) {
@@ -633,7 +635,7 @@ public class NeoRenderer {
     }
     
     private static boolean isWireframeEnabled() {
-        return Config.wireframe && CheatHelper.canCheat();
+        return NeodymiumConfig.wireframe.getBooleanValue() && CheatHelper.canCheat();
     }
     
     public static class NeoChunkComparator implements Comparator<NeoChunk> {
