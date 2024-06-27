@@ -242,7 +242,7 @@ public class NeoRenderer {
     }
     
     private void handleKeyboard() {
-        if (NeodymiumConfig.debugPrefix.getHotkey() == 0 || (NeodymiumConfig.debugPrefix.getHotkey() != -1 && Keyboard.isKeyDown(NeodymiumConfig.debugPrefix.getHotkey()))) {
+        if (NeodymiumConfig.debugPrefix.getKeyCode() == 0 || (NeodymiumConfig.debugPrefix.getKeyCode() != -1 && Keyboard.isKeyDown(NeodymiumConfig.debugPrefix.getKeyCode()))) {
             if (CheatHelper.canCheat()) {
                 if (Keyboard.isKeyDown(Keyboard.KEY_F) && !wasDown[Keyboard.KEY_F]) {
                     rendererActive = !rendererActive;

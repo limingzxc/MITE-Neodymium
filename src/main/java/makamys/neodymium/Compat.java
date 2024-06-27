@@ -29,7 +29,8 @@ public class Compat {
     
     public static void init() {
         isGL33Supported = GLContext.getCapabilities().OpenGL33;
-        if (!FishModLoader.isServer()) {
+        if (!FishModLoader.isServer() && System.getProperty("os.name") != null &&
+                System.getProperty("os.name").contains("Windows")) {
             // && !FabricLauncherBase.getLauncher().isDevelopment()
             boolean found = false;
             Minecraft.getMinecraft().getPlayerUsageSnooper().startSnooper();

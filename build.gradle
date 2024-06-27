@@ -28,7 +28,7 @@ loom {
 	mergedMinecraftJar()
 	setFML(new File("libs\\FishModLoader-v3.2.2.jar"))
 	mods {
-		"MITE-ITE" {
+		"MITE-Neodymium" {
 			sourceSet sourceSets.main
 		}
 	}
@@ -47,7 +47,7 @@ dependencies {
 	mappings loom.fmlMCPMappings()
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 //	implementation("org.spongepowered:mixin:0.8.5")
-	implementation files("libs\\ManyLib-1.0.1.jar")
+	implementation files("libs\\ManyLib-1.1.1.jar")
 
 	// FishModLoader API. And I probably want it anyway.
 	implementation files(loom.getFML().toPath())

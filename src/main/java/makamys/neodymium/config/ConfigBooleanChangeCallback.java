@@ -1,9 +1,6 @@
 package makamys.neodymium.config;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import fi.dy.masa.malilib.config.options.ConfigBoolean;
-import fi.dy.masa.malilib.util.JsonUtils;
 
 import javax.annotation.Nullable;
 

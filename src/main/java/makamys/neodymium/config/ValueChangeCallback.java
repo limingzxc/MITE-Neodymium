@@ -1,8 +1,7 @@
 package makamys.neodymium.config;
 
 import fi.dy.masa.malilib.config.interfaces.IConfigBase;
-import fi.dy.masa.malilib.config.options.ConfigBase;
-import fi.dy.masa.malilib.interfaces.IValueChangeCallback;
+import fi.dy.masa.malilib.config.interfaces.IValueChangeCallback;
 import makamys.neodymium.Neodymium;
 
 import java.util.Timer;

@@ -28,7 +28,7 @@ public class NeodymiumConfig extends SimpleConfigs {
     public static ConfigBoolean enabled = new ConfigBoolean("启用", true, "将此设置为 false 可完全禁用该模组。");
 
     // @ConfigBoolean(cat="_general", def=false, com="Apply changes made in the config file immediately without having to manually reload the renderer. Off by default because it could potentially cause poor performance on certain platforms.")
-    public static ConfigBoolean hotswap = new ConfigBoolean("热加载", false, "立即应用在配置文件中所做的更改，而无需手动重新加载渲染器。默认情况下处于关闭状态，因为它可能会导致某些平台上的性能不佳。");
+    // public static ConfigBoolean hotswap = new ConfigBoolean("热加载", false, "立即应用在配置文件中所做的更改，而无需手动重新加载渲染器。默认情况下处于关闭状态，因为它可能会导致某些平台上的性能不佳。");
 
     // @NeedsReload
     // @ConfigBoolean(cat="render", def=false, com="Simplify chunk meshes so they are made of less vertices. Reduces vertex count at the cost of increasing shader complexity. It seems to reduce performance overall.")
@@ -93,7 +93,7 @@ public class NeodymiumConfig extends SimpleConfigs {
     }
 
     public static void init() {
-        _general = List.of(enabled, hotswap);
+        _general = List.of(enabled);
         render = List.of(simplifyChunkMeshes, cullFaces, shortUV, sortFrequency, fogOcclusion, fogOcclusionWithoutFog,
                 VRAMSize, renderFog, maxUnalignedQuadDistance);
         misc = List.of(replaceOpenGLSplash, ignoreIncompatibilities, silenceErrors);

@@ -11,6 +11,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import net.fabricmc.loader.impl.FabricLoaderImpl;
 import net.xiaoyu233.fml.relaunch.Launch;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
@@ -24,7 +25,7 @@ public class Util {
     public static Path getResourcePath(String relPath) {
         if(allowResourceOverrides) {
             // Launch.minecraftHome
-            File overrideFile = new File(new File(Launch.minecraftHome, "neodymium/resources"), relPath);
+            File overrideFile = new File(new File(FabricLoaderImpl.INSTANCE.getGameDir().toFile(), "neodymium/resources"), relPath);
             if(overrideFile.exists()) {
                 return overrideFile.toPath();
             }
@@ -32,13 +33,13 @@ public class Util {
         
         try {
             URL resourceURL = Util.class.getClassLoader().getResource(relPath);
-            
+
             switch(resourceURL.getProtocol()) {
             case "jar":
                 String urlString = resourceURL.getPath();
                 int lastExclamation = urlString.lastIndexOf('!');
                 String newURLString = urlString.substring(0, lastExclamation);
-                return FileSystems.newFileSystem(new File(URI.create(newURLString)).toPath(), (ClassLoader) null).getPath(relPath);
+                return FileSystems.newFileSystem(new File(URI.create(newURLString)).toPath()).getPath(relPath);
             case "file":
                 return new File(URI.create(resourceURL.toString())).toPath();
             default:

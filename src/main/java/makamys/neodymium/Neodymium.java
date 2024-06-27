@@ -68,9 +68,9 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     }*/
     
     private void onPlayerWorldChanged(World newWorld) {
-    	if(getRendererWorld() == null && newWorld != null) {
-    		NeodymiumConfig.getInstance().load();
-    	}
+//    	if(getRendererWorld() == null && newWorld != null) {
+//    		NeodymiumConfig.getInstance().load();
+//    	}
     	if(renderer != null) {
             destroyRenderer();
         }
@@ -158,14 +158,12 @@ public class Neodymium implements ModInitializer, PreLaunchEntrypoint
     public void onClientTick() {
         if(!NeodymiumConfig.enabled.getBooleanValue()) return;
         if(isActive()) {
-            if(NeodymiumConfig.hotswap.getBooleanValue()) {
-                if(NeodymiumConfig.reloadIfChanged(CONFIG_RELOAD_INFO)) {
-                    if(CONFIG_RELOAD_INFO.needReload) {
-                        Minecraft.getMinecraft().renderGlobal.loadRenderers();
-                        CONFIG_RELOAD_INFO.needReload = false;
-                    } else if(renderer != null) {
-                        renderer.reloadShader();
-                    }
+            if(NeodymiumConfig.reloadIfChanged(CONFIG_RELOAD_INFO)) {
+                if(CONFIG_RELOAD_INFO.needReload) {
+                    Minecraft.getMinecraft().renderGlobal.loadRenderers();
+                    CONFIG_RELOAD_INFO.needReload = false;
+                } else if(renderer != null) {
+                    renderer.reloadShader();
                 }
             }
             /*if (Minecraft.getMinecraft().isSingleplayer() && false) {

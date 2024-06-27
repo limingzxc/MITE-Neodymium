@@ -4,6 +4,7 @@ package makamys.neodymium.util;
 import net.minecraft.Minecraft;
 import net.minecraft.EntityPlayer;
 import net.minecraft.World;
+import net.xiaoyu233.fml.FishModLoader;
 
 public class CheatHelper {
 
