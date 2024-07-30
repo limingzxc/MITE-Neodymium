@@ -1,2 +1,55 @@
 options.renderDistance.ultrafar=超远
 options.renderDistance.veryfar=很远
+
+config.name.enabledNeodymium=启用
+config.comment.enabledNeodymium=将此设置为 false 可完全禁用该模组。
+
+config.name.simplifyChunkMeshes=简化区块网格
+config.comment.simplifyChunkMeshes=简化区块块网格，使其由更少的顶点组成。以增加着色器复杂性为代价减少顶点计数。它似乎降低了整体性能。
+
+config.name.cullFaces=剔除相机背面
+config.comment.cullFaces=玩家摄像机视角的背面不会进行渲染。这会减少 GPU 的工作量，但会增加驱动程序的开销。这通常会提高帧率，但如果您不受填充速率限制（例如在小分辨率下播放时），可能会降低帧率。
+
+config.name.shortUV=使用short类型存储纹理映射坐标
+config.comment.shortUV=将纹理坐标存储为短数据而非浮点数。这将略微减少内存使用量，并可能提高少量性能。可能会略微影响视觉效果，但只有在纹理图集很大的情况下才会明显。
+
+config.name.sortFrequency=透明网格排序间隔帧
+config.comment.sortFrequency=透明网格排序之间的间隔（以帧为单位）。增加此值将减少 CPU 使用量，但也会增加加载透明块时出现图形伪影的可能性。
+
+config.name.fogOcclusion=雾遮挡
+config.comment.fogOcclusion=不要渲染被雾遮挡的网格。
+
+config.name.fogOcclusionWithoutFog=雾效果禁用时雾遮挡
+config.comment.fogOcclusionWithoutFog=即使雾效果已禁用，也执行雾遮挡。
+
+config.name.VRAMSize=显存缓冲区大小
+config.comment.VRAMSize=显存缓冲区大小（MB）。在普通渲染距离下，512 似乎是一个不错的值。如果游戏中遇到显存快要满的警告，请增加此值。不影响内存使用量。
+
+config.name.renderFog=渲染雾
+config.comment.renderFog=渲染雾？会稍微降低帧率。
+
+config.name.maxUnalignedQuadDistance=最大未对齐四边形距离
+config.comment.maxUnalignedQuadDistance=超过这个距离的区块（以区块为单位）将不会渲染未对齐的四边形，比如高草。
+
+config.name.replaceOpenGLSplash=替换主界面OpenGL标语
+config.comment.replaceOpenGLSplash=将显示为“OpenGL 1.2!”的标语替换为“OpenGL 3.3!”。只是为了好玩。
+
+config.name.ignoreIncompatibilities=忽略不兼容
+config.comment.ignoreIncompatibilities=不要在聊天中警告不兼容性，并且即使存在关键不兼容性也激活渲染器。
+
+config.name.silenceErrors=不显示非关键的渲染错误
+config.comment.silenceErrors=不要打印非关键的渲染错误。
+
+config.name.maxMeshesPerFrame=每帧最大网格数
+config.comment.maxMeshesPerFrame=每帧最大网格数，设置为-1代表无限制。
+
+config.name.debugPrefix=调试按键
+config.comment.debugPrefix=按下调试键绑定时必须按住的键的 LWJGL 键码。将其设置为 0 将使键绑定可在不按任何其他键的情况下使用。将其设置为 -1 将完全禁用调试键绑定。
+
+config.name.showDebugInfo=显示调试信息
+config.comment.showDebugInfo=将此设置为 false 以停止在 F3 调试屏幕中显示调试信息。
+
+config.name.wireframe=wireframe
+
+config.name.enableVanillaChunkMeshes=启用原版区块网格
+config.comment.enableVanillaChunkMeshes=启用原版区块网格的构建。这样可以在不影响区块更新性能的情况下，随时切换到原版渲染器。

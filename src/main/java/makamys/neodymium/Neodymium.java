@@ -21,18 +21,18 @@ import makamys.neodymium.renderer.NeoRenderer;
 import makamys.neodymium.util.ChatUtil;
 import makamys.neodymium.util.WarningHelper;
 import net.minecraft.Minecraft;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class Neodymium implements ModInitializer, PreLaunchEntrypoint
 {
     public static Neodymium instance = new Neodymium();
     
     public static final NeodymiumConfig.ReloadInfo CONFIG_RELOAD_INFO = new NeodymiumConfig.ReloadInfo();
-
     private static Map<String, Object> properties;
     private boolean renderDebugText = false;
     
     public static NeoRenderer renderer;
-    
     private static World rendererWorld;
     
     /*@EventHandler

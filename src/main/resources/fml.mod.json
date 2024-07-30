@@ -4,11 +4,11 @@
   "version": "${version}",
   "depends": {
     "fishmodloader": ">=3.2.2",
-    "many-lib": ">=1.1.1"
+    "many-lib": ">=2.0.1"
   },
-  "environment": "*",
+  "environment": "client",
   "name": "Neodymium",
-  "description": "",
+  "description": "Neodymium is a mod that reimplements chunk rendering in MITE using modern OpenGL. This should improve performance on most hardware.",
   "authors": [
     "Makamys",
     "Arminias",
