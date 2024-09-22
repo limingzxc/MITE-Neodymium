@@ -3,23 +3,31 @@
   "id": "neodymium",
   "version": "${version}",
   "depends": {
-    "fishmodloader": ">=3.2.2",
-    "many-lib": ">=2.0.1"
+    "fishmodloader": ">=3.3.2",
+    "many-lib": ">=2.2.0"
   },
   "environment": "client",
   "name": "Neodymium",
-  "description": "Neodymium is a mod that reimplements chunk rendering in MITE using modern OpenGL. This should improve performance on most hardware.",
+  "description": "Neodymium is a mod that reimplements chunk rendering in MITE using modern OpenGL. This should improve performance on most hardware.\n使用新的 OpenGL 功能来重新实现方块渲染以提高性能。",
   "authors": [
     "Makamys",
     "Arminias",
     "Limingzxc"
   ],
+  "icon": "icon.png",
+  "contact": {
+    "homepage": "https://github.com/limingzxc/MITE-Neodymium",
+    "issues": "https://github.com/limingzxc/MITE-Neodymium/issues"
+  },
   "entrypoints": {
     "main": [
       "makamys.neodymium.Neodymium"
     ],
     "preLaunch": [
       "makamys.neodymium.Neodymium"
+    ],
+    "modmenu": [
+      "makamys.neodymium.compat.NeodymiumModMenu"
     ]
   },
   "mixins": [
@@ -28,6 +36,7 @@
   "accessWidener": "Neodymium.accesswidener",
   "custom": {
     "loom:injected_interfaces": {
-    }
+    },
+    "modmenu:clientsideOnly": true
   }
 }
