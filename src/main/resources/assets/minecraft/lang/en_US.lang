@@ -13,6 +13,12 @@ config.comment.cullFaces=Don't submit faces for rendering if they are facing awa
 config.name.shortUV=ShortUV
 config.comment.shortUV=Store texture coordinates as shorts instead of floats. Slightly reduces memory usage and might improve performance by small amount. Might affect visuals slightly, but it's only noticable if the texture atlas is huge.
 
+config.name.bufferSizePass0=bufferSizePass0
+config.comment.bufferSizePass0=The size of the allocation chunks for opaque geometry (in Megabytes). Requires game restart to apply.
+
+config.name.bufferSizePass1=bufferSizePass1
+config.comment.bufferSizePass1=The size of the allocation chunks for transparent geometry (in Megabytes). Requires game restart to apply.
+
 config.name.sortFrequency=SortFrequency
 config.comment.sortFrequency=Interval (in frames) between the sorting of transparent meshes. Increasing this will reduce CPU usage, but also increase the likelyhood of graphical artifacts appearing when transparent chunks are loaded.
 

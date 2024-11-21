@@ -2,56 +2,59 @@ package makamys.neodymium.renderer;
 
 import static makamys.neodymium.Constants.LOGGER;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
+import gnu.trove.list.array.TIntArrayList;
+import makamys.neodymium.Neodymium;
 import makamys.neodymium.config.NeodymiumConfig;
-import makamys.neodymium.mixin.TessellatorAccessor;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
-import makamys.neodymium.ducks.IWorldRenderer;
+import makamys.neodymium.ducks.NeodymiumWorldRenderer;
 import makamys.neodymium.util.BufferWriter;
-import makamys.neodymium.util.RecyclingList;
 import makamys.neodymium.util.Util;
 import makamys.neodymium.util.WarningHelper;
 import net.minecraft.Minecraft;
-import net.minecraft.*;
+import net.minecraft.Tessellator;
+import net.minecraft.WorldRenderer;
+import net.minecraft.Entity;
+import net.minecraft.TileEntity;
 
 /** A mesh for a 16x16x16 region of the world. */
 public class ChunkMesh extends Mesh {
     
     WorldRenderer wr;
     private int tesselatorDataCount;
-    
+
     private int[] subMeshStart = new int[NORMAL_ORDER.length]; 
     
-    public static int usedRAM = 0;
-    public static int instances = 0;
-    
-    private static RecyclingList<MeshQuad> quadBuf = new RecyclingList<>(MeshQuad::new);
-    
-    private static ChunkMesh meshCaptureTarget;
-    
-    private static final QuadNormal[] NORMAL_ORDER = new QuadNormal[] {QuadNormal.NONE, QuadNormal.POSITIVE_Y, QuadNormal.POSITIVE_X, QuadNormal.POSITIVE_Z, QuadNormal.NEGATIVE_X, QuadNormal.NEGATIVE_Z, QuadNormal.NEGATIVE_Y};
-    private static final Comparator<MeshQuad> MESH_QUAD_RENDER_COMPARATOR = new MeshQuadRenderOrderComparator();
-    private static final int[] QUAD_NORMAL_TO_NORMAL_ORDER;
-    
+    public static final AtomicLong usedRAM = new AtomicLong();
+    public static final AtomicInteger instances = new AtomicInteger();
+
+    public static final ThreadLocal<PolygonMeshBuffer> polygonBuf = ThreadLocal.withInitial(PolygonMeshBuffer::new);
+
+    private static final PolygonNormal[] NORMAL_ORDER = new PolygonNormal[] {PolygonNormal.NONE, PolygonNormal.POSITIVE_Y, PolygonNormal.POSITIVE_X, PolygonNormal.POSITIVE_Z, PolygonNormal.NEGATIVE_X, PolygonNormal.NEGATIVE_Z, PolygonNormal.NEGATIVE_Y};
+    private static final int[] POLYGON_NORMAL_TO_NORMAL_ORDER;
+    private static final int[] NORMAL_ORDER_TO_POLYGON_NORMAL;
+
     private static final Flags FLAGS = new Flags(true, true, true, false);
     
     static {
-        QUAD_NORMAL_TO_NORMAL_ORDER = new int[QuadNormal.values().length];
-        for(int i = 0; i < QuadNormal.values().length; i++) {
-            int idx = Arrays.asList(NORMAL_ORDER).indexOf(QuadNormal.values()[i]);
+        POLYGON_NORMAL_TO_NORMAL_ORDER = new int[PolygonNormal.values().length];
+        NORMAL_ORDER_TO_POLYGON_NORMAL = new int[PolygonNormal.values().length];
+        for(int i = 0; i < PolygonNormal.values().length; i++) {
+            int idx = Arrays.asList(NORMAL_ORDER).indexOf(PolygonNormal.values()[i]);
             if(idx == -1) {
                 idx = 0;
             }
-            QUAD_NORMAL_TO_NORMAL_ORDER[i] = idx;
+            POLYGON_NORMAL_TO_NORMAL_ORDER[i] = idx;
+            NORMAL_ORDER_TO_POLYGON_NORMAL[idx] = i;
         }
     }
     
@@ -63,57 +66,64 @@ public class ChunkMesh extends Mesh {
         this.pass = pass;
         Arrays.fill(subMeshStart, -1);
         
-        instances++;
+        instances.getAndIncrement();
         
-        if(!quadBuf.getAsList().isEmpty()) {
+        if(!polygonBuf.get().isEmpty()) {
             LOGGER.error("Invalid state: tried to construct a chunk mesh before the previous one has finished constructing!");
         }
     }
-    
-    public static void preTessellatorDraw(Tessellator t) {
-        if(meshCaptureTarget != null) {
-            meshCaptureTarget.addTessellatorData(t);
-        }
-    }
 
-    private void addTessellatorData(Tessellator t) {
+    public void addTessellatorData(Tessellator t) {
         tesselatorDataCount++;
         
-        if(((TessellatorAccessor)t).getVertexCount() == 0) {
+        if(t.vertexCount == 0) {
             // Sometimes the tessellator has no vertices and weird flags. Don't warn in this case, just silently return.
             return;
         }
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
-        if(((TessellatorAccessor) t).getDrawMode() != GL11.GL_QUADS && ((TessellatorAccessor) t).getDrawMode() != GL11.GL_TRIANGLES) {
-            errors.add("Unsupported draw mode: " + ((TessellatorAccessor) t).getDrawMode());
+        if(t.drawMode != GL11.GL_QUADS && t.drawMode != GL11.GL_TRIANGLES) {
+            errors.add("Unsupported draw mode: " + t.drawMode);
         }
-        if(!((TessellatorAccessor) t).isHasTexture()) {
+        if (drawMode == -1) {
+            drawMode = t.drawMode;
+            verticesPerPolygon = t.drawMode == GL11.GL_QUADS ? 4 : 3;
+        } else if (drawMode != t.drawMode) {
+            errors.add("Mismatched draw mode. Expected: " + drawMode + ", tessellator: " + t.drawMode);
+        }
+        int vertices = verticesPerPolygon;
+
+        if(!t.hasTexture) {
             errors.add("Texture data is missing.");
         }
-        if(!((TessellatorAccessor) t).isHasBrightness()) {
+        if(!t.hasBrightness) {
             warnings.add("Brightness data is missing");
         }
-        if(!((TessellatorAccessor) t).isHasColor()) {
+        if(!t.hasColor) {
             warnings.add("Color data is missing");
         }
-        if(((TessellatorAccessor) t).isHasNormals() && GL11.glIsEnabled(GL11.GL_LIGHTING)) {
-            errors.add("Chunk uses GL lighting, this is not implemented.");
-        }
-        FLAGS.hasBrightness = ((TessellatorAccessor) t).isHasBrightness();
-        FLAGS.hasColor = ((TessellatorAccessor) t).isHasColor();
-        
-        int verticesPerPrimitive = ((TessellatorAccessor) t).getDrawMode() == GL11.GL_QUADS ? 4 : 3;
-        
-        for(int quadI = 0; quadI < ((TessellatorAccessor) t).getVertexCount() / verticesPerPrimitive; quadI++) {
-            MeshQuad quad = quadBuf.next();
-            quad.setState(((TessellatorAccessor) t).getRawBuffer(), quadI * (verticesPerPrimitive * 8), FLAGS, ((TessellatorAccessor) t).getDrawMode(), (float)-((TessellatorAccessor) t).getXOffset(), (float)-((TessellatorAccessor) t).getYOffset(), (float)-((TessellatorAccessor) t).getZOffset());
-            if(quad.deleted) {
-                quadBuf.remove();
+        // TODO This opengl call crashes the JVM when not run on the client thread.
+//        if(t.hasNormals && GL11.glIsEnabled(GL11.GL_LIGHTING)) {
+//            errors.add("Chunk uses GL lighting, this is not implemented.");
+//        }
+        FLAGS.hasBrightness = t.hasBrightness;
+        FLAGS.hasColor = t.hasColor;
+
+        int tessellatorVertexSize = Neodymium.util.vertexSizeInTessellator();
+        int polygonSize = Neodymium.util.polygonSize(vertices);
+
+        int polygonCount = t.vertexCount / vertices;
+
+        final PolygonMeshBuffer buf = polygonBuf.get();
+        buf.ensureCapacity(polygonCount * polygonSize);
+        for(int polygonI = 0; polygonI < polygonCount; polygonI++) {
+            boolean deleted = MeshPolygon.processPolygon(t.rawBuffer, polygonI * vertices * tessellatorVertexSize, buf.data, buf.size, NeoRegion.toRelativeOffset(-t.xOffset), NeoRegion.toRelativeOffset(-t.yOffset), NeoRegion.toRelativeOffset(-t.zOffset), vertices, FLAGS);
+            if (!deleted) {
+                buf.size += polygonSize;
             }
         }
         
-        if(!quadBuf.isEmpty()) {
+        if(!buf.isEmpty()) {
             // Only show errors if we're actually supposed to be drawing something
             if(!errors.isEmpty() || !warnings.isEmpty()) {
                 if(!NeodymiumConfig.silenceErrors.getBooleanValue()) {
@@ -126,7 +136,7 @@ public class ChunkMesh extends Mesh {
                         for(String warning : warnings) {
                             LOGGER.error("Warning: " + warning);
                         }
-                        LOGGER.error("(World renderer pos: ({}, {}, {}), Tessellator pos: ({}, {}, {}), Tessellation count: {}", wr.posX, wr.posY, wr.posZ, ((TessellatorAccessor) t).getXOffset(), ((TessellatorAccessor) t).getYOffset(), ((TessellatorAccessor) t).getZOffset(), tesselatorDataCount);
+                        LOGGER.error("(World renderer pos: ({}, {}, {}), Tessellator pos: ({}, {}, {}), Tessellation count: {}", wr.posX, wr.posY, wr.posZ, t.xOffset, t.yOffset, t.zOffset, tesselatorDataCount);
                         LOGGER.error("Stack trace:");
                         try {
                             // Generate a stack trace
@@ -135,7 +145,7 @@ public class ChunkMesh extends Mesh {
                             e.printStackTrace();
                         }
                         LOGGER.error("Skipping chunk due to errors.");
-                        quadBuf.reset();
+                        buf.reset();
                     } else {
                         WarningHelper.showDebugMessageOnce(String.format("Warnings in chunk (%d, %d, %d) in dimension %s: %s", x, y, z, dimId, String.join(", ", warnings)));
                     }
@@ -145,129 +155,59 @@ public class ChunkMesh extends Mesh {
     }
     
     private static String tessellatorToString(Tessellator t) {
-        return "(" + ((TessellatorAccessor) t).getXOffset() + "," + ((TessellatorAccessor) t).getYOffset() + "," + ((TessellatorAccessor) t).getZOffset() + ")";
+        return "(" + t.xOffset + ", " + t.yOffset + ", " + t.zOffset + ")";
     }
-    
+
+    private int bufferSize = 0;
+    @Override
+    public int bufferSize() {
+        return bufferSize;
+    }
+
     public void finishConstruction() {
-        List<MeshQuad> quads = quadBuf.getAsList();
-        
-        if(NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
-            ArrayList<ArrayList<MeshQuad>> quadsByPlaneDir = new ArrayList<>(); // XY, XZ, YZ
-            for(int i = 0; i < 3; i++) {
-                quadsByPlaneDir.add(new ArrayList<>());
-            }
-            for(MeshQuad quad : quads) {
-                if(quad.getPlane() != MeshQuad.Plane.NONE) {
-                    quadsByPlaneDir.get(quad.getPlane().ordinal() - 1).add(quad);
-                }
-            }
-            for(int plane = 0; plane < 3; plane++) {
-                quadsByPlaneDir.get(plane).sort(MeshQuad.QuadPlaneComparator.quadPlaneComparators[plane]);
-            }
-            
-            for(int plane = 0; plane < 3; plane++) {
-                List<MeshQuad> planeDirQuads = quadsByPlaneDir.get(plane);
-                int planeStart = 0;
-                for(int quadI = 0; quadI < planeDirQuads.size(); quadI++) {
-                    MeshQuad quad = planeDirQuads.get(quadI);
-                    MeshQuad nextQuad = quadI == planeDirQuads.size() - 1 ? null : planeDirQuads.get(quadI + 1);
-                    if(!quad.onSamePlaneAs(nextQuad)) {
-                        simplifyPlane(planeDirQuads.subList(planeStart, quadI + 1));
-                        planeStart = quadI + 1;
-                    }
-                }
-            }
-        }
-        
-        quadCount = countValidQuads(quads);
-        buffer = createBuffer(quads, quadCount);
-        usedRAM += buffer.limit();
-        
-        quadBuf.reset();
-    }
-    
-    private static void simplifyPlane(List<MeshQuad> planeQuads) {
-        // Exclude quads from merging if they have identical vertex positions to another quad.
-        // Workaround for z-fighting issue that arises when merging fancy grass and the overlay quad
-        // is a different dimension than the base quad.
-        for(int i = 0; i < planeQuads.size(); i++) {
-            MeshQuad a = planeQuads.get(i);
-            for(int j = i + 1; j < planeQuads.size(); j++) {
-                MeshQuad b = planeQuads.get(j);
-                if(!a.noMerge && a.isPosEqual(b)) {
-                    a.noMerge = true;
-                    b.noMerge = true;
-                } else {
-                    // Due to sorting, identical quads will always be next to each other
-                    break;
-                }
-            }
-        }
-        
-        MeshQuad lastQuad = null;
-        // Pass 1: merge quads to create rows
-        for(MeshQuad quad : planeQuads) {
-            if(lastQuad != null) {
-                lastQuad.tryToMerge(quad);
-            }
-            if(MeshQuad.isValid(quad)) {
-                lastQuad = quad;
-            }
-        }
+        final PolygonMeshBuffer buf = polygonBuf.get();
+        polygonCount = buf.size / Neodymium.util.polygonSize(verticesPerPolygon);
+        buffer = createBuffer(buf.data);
+        bufferSize = buffer.limit();
+        usedRAM.getAndAdd(bufferSize);
 
-        for (MeshQuad planeQuad : planeQuads) {
-            planeQuad.mergeReference = null;
-        }
-        
-        // Pass 2: merge rows to create rectangles
-        // TODO optimize?
-        for(int i = 0; i < planeQuads.size(); i++) {
-            for(int j = i + 1; j < planeQuads.size(); j++) {
-                planeQuads.get(i).tryToMerge(planeQuads.get(j));
-            }
-        }
-    }
-    
-    private static int countValidQuads(List<MeshQuad> quads) {
-        int quadCount = 0;
-        for(MeshQuad quad : quads) {
-            if(!quad.deleted) {
-                quadCount++;
-            }
-        }
-        return quadCount;
+        buf.reset();
     }
 
-    private ByteBuffer createBuffer(List<? extends MeshQuad> quads, int quadCount) {
-        ByteBuffer buffer = BufferUtils.createByteBuffer(quadCount * 4 * MeshQuad.getStride());
+    //Used by FalseTweaks when cancelling a threaded render job
+    public static void cancelRendering() {
+        final PolygonMeshBuffer buf = polygonBuf.get();
+        if (!buf.isEmpty()) {
+            buf.reset();
+            LOGGER.debug("Cancelled unfinished render pass!");
+        }
+    }
+
+    private static final ThreadLocal<MeshPolygonBucketSort> threadBucketer = ThreadLocal.withInitial(
+            MeshPolygonBucketSort::new);
+
+    private ByteBuffer createBuffer(int[] polygons) {
+        final int stride = Neodymium.renderer.getStride();
+        ByteBuffer buffer = BufferUtils.createByteBuffer(polygonCount * verticesPerPolygon * stride);
         BufferWriter out = new BufferWriter(buffer);
         
         boolean sortByNormals = pass == 0;
-        
+
+        final int polygonSize = Neodymium.util.polygonSize(verticesPerPolygon);
+        int[] indices = null;
         if(sortByNormals) {
-            quads.sort(MESH_QUAD_RENDER_COMPARATOR);
+            indices = threadBucketer.get().sort(polygons, polygonSize, polygonCount);
         }
-        
-        try {
-            int i = 0;
-            for(MeshQuad quad : quads) {
-                if(i < quadCount) {
-                    if(MeshQuad.isValid(quad)) {
-                        int subMeshStartIdx = sortByNormals ? QUAD_NORMAL_TO_NORMAL_ORDER[quad.normal.ordinal()] : 0;
-                        if(subMeshStart[subMeshStartIdx] == -1) {
-                            subMeshStart[subMeshStartIdx] = i;
-                        }
-                        quad.writeToBuffer(out);
-                        i++;
-                    } else if(sortByNormals){
-                        break;
-                    }
-                }
+
+        for (int i = 0; i < polygonCount; i++) {
+            int index = indices != null ? indices[i] : i;
+            int subMeshStartIdx = sortByNormals ? POLYGON_NORMAL_TO_NORMAL_ORDER[polygons[(index + 1) * polygonSize - 1]] : 0;
+            if(subMeshStart[subMeshStartIdx] == -1) {
+                subMeshStart[subMeshStartIdx] = i;
             }
-        } catch(IOException e) {
-            e.printStackTrace();
+            Neodymium.util.writeMeshPolygonToBuffer(polygons, index * polygonSize, out, stride, verticesPerPolygon);
         }
-        
+
         
         buffer.flip();
         return buffer;
@@ -275,8 +215,8 @@ public class ChunkMesh extends Mesh {
     
     void destroy() {
         if(buffer != null) {
-            usedRAM -= buffer.limit();
-            instances--;
+            usedRAM.getAndAdd(-buffer.limit());
+            instances.getAndDecrement();
             buffer = null;
             
             if(gpuStatus == Mesh.GPUStatus.SENT) {
@@ -290,10 +230,6 @@ public class ChunkMesh extends Mesh {
         destroy();
     }
     
-    public int getStride() {
-        return MeshQuad.getStride();
-    }
-    
     static List<ChunkMesh> getChunkMesh(int theX, int theY, int theZ) {
         WorldRenderer wr = new WorldRenderer(Minecraft.getMinecraft().theWorld, new ArrayList<TileEntity>(), theX * 16, theY * 16, theZ * 16, 100000);
     
@@ -302,9 +238,8 @@ public class ChunkMesh extends Mesh {
         wr.isInFrustum = true;
         wr.chunkIndex = 0;
         wr.markDirty();
-        //wr.updateRenderer(Minecraft.getMinecraft().thePlayer);
         wr.updateRenderer();
-        return ((IWorldRenderer)wr).neodymium$getChunkMeshes();
+        return ((NeodymiumWorldRenderer)wr).nd$getChunkMeshes();
     }
     
     @Override
@@ -319,16 +254,16 @@ public class ChunkMesh extends Mesh {
         for(int i = 0; i < NORMAL_ORDER.length + 1; i++) {
             if(i < subMeshStart.length && subMeshStart[i] == -1) continue;
             
-            QuadNormal normal = i < NORMAL_ORDER.length ? NORMAL_ORDER[i] : null;
+            PolygonNormal normal = i < NORMAL_ORDER.length ? NORMAL_ORDER[i] : null;
             boolean isVisible = normal != null && isNormalVisible(normal, cameraXDiv, cameraYDiv, cameraZDiv, pass);
             
             if(isVisible && startIndex == -1) {
-                startIndex = subMeshStart[QUAD_NORMAL_TO_NORMAL_ORDER[normal.ordinal()]];
+                startIndex = subMeshStart[POLYGON_NORMAL_TO_NORMAL_ORDER[normal.ordinal()]];
             } else if(!isVisible && startIndex != -1) {
-                int endIndex = i < subMeshStart.length ? subMeshStart[i] : quadCount;
+                int endIndex = i < subMeshStart.length ? subMeshStart[i] : polygonCount;
                 
-                piFirst.put(iFirst + (startIndex*4));
-                piCount.put((endIndex - startIndex)*4);
+                piFirst.put(iFirst + (startIndex*verticesPerPolygon));
+                piCount.put((endIndex - startIndex)*verticesPerPolygon);
                 renderedMeshes++;
                 
                 startIndex = -1;
@@ -338,7 +273,7 @@ public class ChunkMesh extends Mesh {
         return renderedMeshes;
     }
     
-    private boolean isNormalVisible(QuadNormal normal, int interpXDiv, int interpYDiv, int interpZDiv, int pass) {
+    private boolean isNormalVisible(PolygonNormal normal, int interpXDiv, int interpYDiv, int interpZDiv, int pass) {
         return switch (normal) {
             case POSITIVE_X -> interpXDiv >= ((x));
             case NEGATIVE_X -> interpXDiv < ((x + 1));
@@ -347,7 +282,8 @@ public class ChunkMesh extends Mesh {
             case POSITIVE_Z -> interpZDiv >= ((z));
             case NEGATIVE_Z -> interpZDiv < ((z + 1));
             default -> pass != 0 || NeodymiumConfig.maxUnalignedQuadDistance.getIntegerValue() == Integer.MAX_VALUE
-                    || Util.distSq(interpXDiv, interpYDiv, interpZDiv, x, y, z) < Math.pow(NeodymiumConfig.maxUnalignedQuadDistance.getIntegerValue(), 2);
+                    || Util.distSq(interpXDiv, interpYDiv, interpZDiv, x, y, z) < Math.pow(
+                            NeodymiumConfig.maxUnalignedQuadDistance.getIntegerValue(), 2);
         };
     }
     
@@ -358,16 +294,12 @@ public class ChunkMesh extends Mesh {
         
         return player.getDistanceSq(centerX, centerY, centerZ); 
     }
-    
-    public static void setCaptureTarget(ChunkMesh cm) {
-        meshCaptureTarget = cm;
-    }
-    
+
     public static class Flags {
-        boolean hasTexture;
-        boolean hasBrightness;
-        boolean hasColor;
-        boolean hasNormals;
+        public boolean hasTexture;
+        public boolean hasBrightness;
+        public boolean hasColor;
+        public boolean hasNormals;
         
         public Flags(byte flags) {
             hasTexture = (flags & 1) != 0;
@@ -400,20 +332,64 @@ public class ChunkMesh extends Mesh {
             return flags;
         }
     }
-    
-    private static class MeshQuadRenderOrderComparator implements Comparator<MeshQuad> {
 
-        @Override
-        public int compare(MeshQuad a, MeshQuad b) {
-            if(!MeshQuad.isValid(b)) {
-                return -1;
-            } else if(!MeshQuad.isValid(a)) {
-                return 1;
-            } else {
-                return QUAD_NORMAL_TO_NORMAL_ORDER[a.normal.ordinal()] - QUAD_NORMAL_TO_NORMAL_ORDER[b.normal.ordinal()];
+    public static class PolygonMeshBuffer {
+        public int[] data = new int[1024];
+        public int size = 0;
+
+        public void ensureCapacity(int maxNewAmount) {
+            int newSize = size + maxNewAmount;
+            if (newSize > data.length) {
+                data = Arrays.copyOf(data, newSize);
             }
         }
-        
+
+        public boolean isEmpty() {
+            return size == 0;
+        }
+
+        public void reset() {
+            size = 0;
+        }
+    }
+
+    public static class MeshPolygonBucketSort {
+        private static final int bucketCount = NORMAL_ORDER_TO_POLYGON_NORMAL.length;
+        private final TIntArrayList[] buckets;
+        private int[] resultBuffer;
+
+        public MeshPolygonBucketSort() {
+            buckets = new TIntArrayList[bucketCount];
+            for (int i = 0; i < bucketCount; i++) {
+                buckets[i] = new TIntArrayList();
+            }
+        }
+
+        private static int bucket(int[] buffer, int polygonSize, int index) {
+            return buffer[polygonSize * (index + 1) - 1];
+        }
+
+        public int[] sort(int[] buffer, int polygonSize, int polygonCount) {
+            for (int i = 0; i < bucketCount; i++) {
+                buckets[i].resetQuick();
+            }
+            for (int i = 0; i < polygonCount; i++) {
+                buckets[bucket(buffer, polygonSize, i)].add(i);
+            }
+            if (resultBuffer == null || resultBuffer.length < polygonCount) {
+                resultBuffer = new int[polygonCount];
+            }
+            final int[] result = resultBuffer;
+            int offset = 0;
+            for (int i = 0; i < bucketCount; i++) {
+                final TIntArrayList bucket = buckets[NORMAL_ORDER_TO_POLYGON_NORMAL[i]];
+                final int size = bucket.size();
+                bucket.toArray(result, 0, offset, size);
+                offset += size;
+            }
+            assert offset == polygonCount;
+            return result;
+        }
     }
 
 }

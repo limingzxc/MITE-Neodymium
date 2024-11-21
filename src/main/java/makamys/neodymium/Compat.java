@@ -1,23 +1,20 @@
 package makamys.neodymium;
 
-import static makamys.neodymium.Constants.LOGGER;
+import makamys.neodymium.config.NeodymiumConfig;
+import makamys.neodymium.util.virtualjar.IVirtualJar;
+import makamys.neodymium.util.virtualjar.VirtualJar;
+import net.minecraft.GameSettings;
+import net.minecraft.Minecraft;
+import net.minecraft.Tessellator;
+import net.xiaoyu233.fml.FishModLoader;
+import org.lwjgl.opengl.GLContext;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
-import makamys.neodymium.mixin.PlayerUsageSnooperAccessor;
-//import net.fabricmc.loader.gui.FabricGuiEntry;
-//import net.fabricmc.loader.launch.common.FabricLauncherBase;
-import net.minecraft.GameSettings;
-import net.xiaoyu233.fml.FishModLoader;
-import org.lwjgl.opengl.GLContext;
-
-import makamys.neodymium.config.NeodymiumConfig;
-import makamys.neodymium.util.virtualjar.IVirtualJar;
-import makamys.neodymium.util.virtualjar.VirtualJar;
-import net.minecraft.Minecraft;
+import static makamys.neodymium.Constants.LOGGER;
 
 public class Compat {
     
@@ -25,67 +22,159 @@ public class Compat {
     
     private static boolean wasAdvancedOpenGLEnabled;
     
-    private static int notEnoughVRAMAmountMB = -1;
-    
+    private static boolean IS_RPLE_PRESENT;
+
+    private static boolean IS_FALSE_TWEAKS_PRESENT;
+
+    private static boolean IS_HODGEPODGE_SPEEDUP_ANIMATIONS_ENABLED;
+    private static boolean IS_ANGELICA_SPEEDUP_ANIMATIONS_ENABLED;
+
+    private static boolean IS_SHADERS_MOD_PRESENT;
+
+    private static boolean isShadersEnabled;
+
+
     public static void init() {
         isGL33Supported = GLContext.getCapabilities().OpenGL33;
-        if (!FishModLoader.isServer() && System.getProperty("os.name") != null &&
-                System.getProperty("os.name").contains("Windows")) {
-            // && !FabricLauncherBase.getLauncher().isDevelopment()
-            boolean found = false;
-            Minecraft.getMinecraft().getPlayerUsageSnooper().startSnooper();
-            Map map = ((PlayerUsageSnooperAccessor)Minecraft.getMinecraft().getPlayerUsageSnooper()).getDataMap();
-            for (Object o : map.values()) {
-                String s;
-                try {
-                    s = (String) o;
-                } catch (ClassCastException e) {
-                    continue;
-                }
-                //System.out.println(s);
-                if (s.equals("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump")) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                new Warning("Neodymium requires the JVM argument -XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump to be set. Please add it to your JVM arguments.");
-            }
-        }
-        /*if (Loader.isModLoaded("triangulator")) {
-            disableTriangulator();
-        }*/
+        
+//        if (Loader.isModLoaded("rple")) {
+//            IS_RPLE_PRESENT = true;
+//        }
+//
+//        if (Loader.isModLoaded("falsetweaks")) {
+//            IS_FALSE_TWEAKS_PRESENT = true;
+//        }
+
+//        try {
+//            if (Launch.classLoader.getClassBytes("shadersmod.client.Shaders") != null) {
+//                IS_SHADERS_MOD_PRESENT = true;
+//            }
+
+//        } catch (IOException e) {
+//            IS_SHADERS_MOD_PRESENT = false;
+//        }
+        IS_SHADERS_MOD_PRESENT = FishModLoader.hasMod("shader-loader");
+
+        IS_HODGEPODGE_SPEEDUP_ANIMATIONS_ENABLED = checkIfHodgepodgeSpeedupAnimationsIsEnabled();
+        IS_ANGELICA_SPEEDUP_ANIMATIONS_ENABLED = checkIfAngelicaSpeedupAnimationsIsEnabled();
+        LOGGER.debug("speedupAnimations compat fix will " + (isSpeedupAnimationsEnabled() ? "" : "not ") + "be enabled");
+
     }
 
-    private static void disableTriangulator() {
-        //((ToggleableTessellator) Tessellator.instance).disableTriangulator();
+    public static boolean enableVanillaChunkMeshes() {
+        return NeodymiumConfig.enableVanillaChunkMeshes.getBooleanValue() && !isFalseTweaksModPresent();
     }
-    
-    public static void getCompatibilityWarnings(List<Warning> warns, List<Warning> criticalWarns, boolean statusCommand){
-        if (Minecraft.getMinecraft().gameSettings.advancedOpengl) {
-            warns.add(new Warning("Advanced OpenGL is enabled, performance may be poor." + (statusCommand ? " Click here to disable it." : "")).chatAction("neodymium disable_advanced_opengl"));
+
+    public static boolean keepRenderListLogic() {
+        return enableVanillaChunkMeshes() || Constants.KEEP_RENDER_LIST_LOGIC;
+    }
+
+    private static boolean checkIfHodgepodgeSpeedupAnimationsIsEnabled() {
+        Boolean result = false;
+//        if (Loader.isModLoaded("hodgepodge")) {
+//            try {
+//                Class<?> FixesConfigCls = Class.forName("com.mitchej123.hodgepodge.config.FixesConfig");
+//                Boolean speedupAnimations = (Boolean)FixesConfigCls.getField("speedupAnimations").get(null);
+//                result = speedupAnimations;
+//            } catch(Exception e) {
+//                LOGGER.debug("Failed to determine if Hodgepodge's speedupAnimations is enabled using new config class, trying old one.", e);
+//            }
+//            if(result == null) {
+//                try {
+//                    Class<?> CommonCls = Class.forName("com.mitchej123.hodgepodge.Common");
+//                    Object config = CommonCls.getField("config").get(null);
+//                    Class<?> configCls = config.getClass();
+//                    boolean speedupAnimations = (Boolean)configCls.getField("speedupAnimations").get(config);
+//                    result = speedupAnimations;
+//                } catch(Exception e) {
+//                    LOGGER.debug("Failed to determine if Hodgepodge's speedupAnimations is enabled using old config class.", e);
+//                }
+//            }
+//            if(result != null) {
+//                LOGGER.debug("Hodgepodge's speedupAnimations is set to " + result);
+//            } else {
+//                LOGGER.warn("Failed to determine if Hodgepodge's speedupAnimations is enabled, assuming false");
+//                result = false;
+//            }
+//        } else {
+//            LOGGER.debug("Hodgepodge is missing, treating its speedupAnimations as false");
+//            result = false;
+//        }
+        return result;
+    }
+
+    private static boolean checkIfAngelicaSpeedupAnimationsIsEnabled() {
+        Boolean result = false;
+//        if (Loader.isModLoaded("angelica")) {
+//            try {
+//                Class<?> AngelicaConfigCls = Class.forName("com.gtnewhorizons.angelica.config.AngelicaConfig");
+//                Boolean speedupAnimations = (Boolean)AngelicaConfigCls.getField("speedupAnimations").get(null);
+//                result = speedupAnimations;
+//            } catch(Exception e) {
+//                LOGGER.debug("Failed to determine if Angelica's speedupAnimations is enabled.", e);
+//            }
+//            if(result != null) {
+//                LOGGER.debug("Angelica's speedupAnimations is set to " + result);
+//            } else {
+//                LOGGER.warn("Failed to determine if Angelica's speedupAnimations is enabled, assuming false");
+//                result = false;
+//            }
+//        } else {
+//            LOGGER.debug("Angelica is missing, treating its speedupAnimations as false");
+//            result = false;
+//        }
+        return result;
+    }
+
+    public static boolean isRPLEModPresent() {
+        return IS_RPLE_PRESENT;
+    }
+
+    public static boolean isFalseTweaksModPresent() {
+        return IS_FALSE_TWEAKS_PRESENT;
+    }
+
+    public static Tessellator tessellator() {
+//        if (IS_FALSE_TWEAKS_PRESENT) {
+//            return FalseTweaksCompat.getThreadTessellator();
+//        } else {
+//            return Tessellator.instance;
+//        }
+        return Tessellator.instance;
+    }
+
+    public static boolean isSpeedupAnimationsEnabled() {
+        return IS_HODGEPODGE_SPEEDUP_ANIMATIONS_ENABLED || IS_ANGELICA_SPEEDUP_ANIMATIONS_ENABLED;
+    }
+
+    public static boolean isOptiFineShadersEnabled() {
+        return isShadersEnabled;
+    }
+
+    public static void updateOptiFineShadersState() {
+        if (!IS_SHADERS_MOD_PRESENT)
+            return;
+
+        String packName = net.wenscHuix.mitemod.shader.client.Shaders.shadersConfig.getProperty("shaderPack");
+        if (!packName.isEmpty()) {
+            isShadersEnabled = true;
         }
-        
-        try {
-            Class<?> shaders = Class.forName("shadersmod.client.Shaders");
-            try {
-                String shaderPack = (String)shaders.getMethod("getShaderPackName").invoke(null);
-                if(shaderPack != null) {
-                    criticalWarns.add(new Warning("A shader pack is enabled, this is not supported."));
-                }
-            } catch(Exception e) {
-                LOGGER.warn("Failed to get shader pack name");
-                e.printStackTrace();
-            }
-        } catch (ClassNotFoundException e) {
-            
+    }
+
+    public static boolean isShadersShadowPass() {
+        if (!IS_SHADERS_MOD_PRESENT)
+            return false;
+
+        return net.wenscHuix.mitemod.shader.client.Shaders.isShadowPass;
+    }
+
+    public static void getCompatibilityWarnings(List<Warning> warns, List<Warning> criticalWarns, boolean statusCommand){
+        if(Minecraft.getMinecraft().gameSettings.advancedOpengl) {
+            warns.add(new Warning("Advanced OpenGL is enabled, performance may be poor." + (statusCommand ? " Click here to disable it." : "")).chatAction("neodymium disable_advanced_opengl"));
         }
         
         if(!isGL33Supported) {
             criticalWarns.add(new Warning("OpenGL 3.3 is not supported."));
-        }
-        if(detectedNotEnoughVRAM()) {
-            criticalWarns.add(new Warning("Not enough VRAM"));
         }
     }
 
@@ -101,18 +190,6 @@ public class Compat {
         return changed;
     }
     
-    public static void onNotEnoughVRAM(int amountMB) {
-        notEnoughVRAMAmountMB = amountMB;
-    }
-    
-    public static void reset() {
-        notEnoughVRAMAmountMB = -1;
-    }
-    
-    private static boolean detectedNotEnoughVRAM() {
-        return NeodymiumConfig.VRAMSize.getIntegerValue() == notEnoughVRAMAmountMB;
-    }
-
     public static void forceEnableOptiFineDetectionOfFastCraft() {
         if(Compat.class.getResource("/fastcraft/Tweaker.class") != null) {
             // If OptiFine is present, it's already on the class path at this point, so our virtual jar won't override it.
@@ -131,7 +208,7 @@ public class Compat {
         }
         return false;
     }
-    
+
     private static class OptiFineStubVirtualJar implements IVirtualJar {
 
         @Override
@@ -151,7 +228,19 @@ public class Compat {
         }
         
     }
-    
+
+    //This extra bit of indirection is needed to avoid accidentally trying to load ThreadedChunkUpdates when FalseTweaks
+    // is not installed.
+//    private static class FalseTweaksCompat {
+//        public static Tessellator getThreadTessellator() {
+//            if (ThreadedChunkUpdates.isEnabled()) {
+//                return ThreadedChunkUpdates.getThreadTessellator();
+//            } else {
+//                return Tessellator.instance;
+//            }
+//        }
+//    }
+
     public static class Warning {
         public String text;
         public String chatAction;

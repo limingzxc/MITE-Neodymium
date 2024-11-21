@@ -13,6 +13,12 @@ config.comment.cullFaces=玩家摄像机视角的背面不会进行渲染。这�
 config.name.shortUV=使用short类型存储纹理映射坐标
 config.comment.shortUV=将纹理坐标存储为短数据而非浮点数。这将略微减少内存使用量，并可能提高少量性能。可能会略微影响视觉效果，但只有在纹理图集很大的情况下才会明显。
 
+config.name.bufferSizePass0=不透明几何体的内存块大小
+config.comment.bufferSizePass0=分配给不透明几何体的内存块大小（MB）。需要重启游戏才能生效。
+
+config.name.bufferSizePass1=透明几何体的内存块大小
+config.comment.bufferSizePass1=分配给透明几何体的内存块大小（MB）。需要重启游戏才能生效。
+
 config.name.sortFrequency=透明网格排序间隔帧
 config.comment.sortFrequency=透明网格排序之间的间隔（以帧为单位）。增加此值将减少 CPU 使用量，但也会增加加载透明块时出现图形伪影的可能性。
 

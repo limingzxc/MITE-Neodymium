@@ -1,20 +1,20 @@
 package makamys.neodymium.command;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
-
-import net.minecraft.*;
-import net.xiaoyu233.fml.FishModLoader;
-import org.lwjgl.input.Mouse;
-
 import makamys.neodymium.Compat;
 import makamys.neodymium.Compat.Warning;
 import makamys.neodymium.Neodymium;
 import makamys.neodymium.util.ChatUtil;
 import makamys.neodymium.util.ChatUtil.MessageVerbosity;
+import net.minecraft.*;
+import net.xiaoyu233.fml.FishModLoader;
+import org.apache.commons.lang3.tuple.Pair;
+import org.lwjgl.input.Mouse;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 public class NeodymiumCommand extends CommandBase {
     
@@ -101,7 +101,7 @@ public class NeodymiumCommand extends CommandBase {
                 List<String> text = Neodymium.renderer.getDebugText(true);
                 addChatMessages(sender, text);
             }
-            Neodymium.Pair<List<Warning>, List<Warning>> allWarns = Neodymium.showCompatStatus(true);
+            Pair<List<Warning>, List<Warning>> allWarns = Neodymium.showCompatStatus(true);
             List<Warning> warns = allWarns.getLeft();
             List<Warning> criticalWarns = allWarns.getRight();
             for(Warning line : warns) {

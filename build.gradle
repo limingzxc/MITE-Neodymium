@@ -47,7 +47,9 @@ dependencies {
 	mappings loom.fmlMCPMappings()
 	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 //	implementation("org.spongepowered:mixin:0.8.5")
+	implementation files("libs\\trove-3.0.3.jar")
 	implementation files("libs\\ManyLib-2.2.0.jar")
+	implementation files("libs\\mite-shader-loader-1.0.3.jar")
 	implementation files("libs\\ModMenu-1.0.0.jar")
 
 	// FishModLoader API. And I probably want it anyway.
@@ -77,6 +79,7 @@ java {
 }
 
 jar {
+	from fileTree("$projectDir/extras/")
 	from("LICENSE") {
 		rename { "${it}_${project.base.archivesName.get()}"}
 	}

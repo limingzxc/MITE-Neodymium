@@ -1,173 +1,191 @@
 package makamys.neodymium.renderer;
 
-import static makamys.neodymium.Constants.VERSION;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL14.*;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL30.*;
-
-import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
+import makamys.neodymium.Compat;
+import makamys.neodymium.Neodymium;
 import makamys.neodymium.config.NeodymiumConfig;
-import makamys.neodymium.mixin.NetClientHandlerAccessor;
-import makamys.neodymium.mixin.PlayerControllerMPAccessor;
+import makamys.neodymium.ducks.NeodymiumWorldRenderer;
+import makamys.neodymium.renderer.Mesh.GPUStatus;
+import makamys.neodymium.renderer.attribs.AttributeSet;
+import makamys.neodymium.util.*;
+import makamys.neodymium.util.Util;
+import net.minecraft.*;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.input.Keyboard;
-import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.*;
 import org.lwjgl.util.vector.Matrix4f;
 import org.lwjgl.util.vector.Vector4f;
 
-import makamys.neodymium.Neodymium;
-import makamys.neodymium.ducks.IWorldRenderer;
-import makamys.neodymium.renderer.Mesh.GPUStatus;
-import makamys.neodymium.util.CheatHelper;
-import makamys.neodymium.util.GuiHelper;
-import makamys.neodymium.util.OFUtil;
-import makamys.neodymium.util.Preprocessor;
-import makamys.neodymium.util.Util;
-import net.minecraft.Minecraft;
-import net.minecraft.*;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicInteger;
 
-/** The main renderer class. */
+import static makamys.neodymium.Constants.VERSION;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL14.glMultiDrawArrays;
+import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL30.glBindVertexArray;
+
+/**
+ * The main renderer class.
+ */
 public class NeoRenderer {
-    
-    private static final MeshDistanceComparator DISTANCE_COMPARATOR = new MeshDistanceComparator();
-    
+
     public boolean hasInited = false;
+    public boolean isFirstPass = true;
     public boolean destroyPending;
     public boolean reloadPending;
     public int rendererSpeedup;
-    
+
     private static boolean[] wasDown = new boolean[256];
-    
+
     public boolean renderWorld;
     public boolean rendererActive;
     private boolean showMemoryDebugger;
-    
+
     public boolean forceRenderFog;
     public boolean hasIncompatibilities;
-    
-    private static int MAX_MESHES;
-    
-    private int VAO;
+
+    private boolean fogEnabled;
+
     private int[] shaderProgramsFog = {0, 0};
     private int[] shaderProgramsNoFog = {0, 0};
-    private IntBuffer[] piFirst = new IntBuffer[2];
-    private IntBuffer[] piCount = new IntBuffer[2];
-    private List<Mesh>[] sentMeshes = (List<Mesh>[])new ArrayList[] {new ArrayList<Mesh>(), new ArrayList<Mesh>()};
-    GPUMemoryManager mem;
-    
+    private List<GPUMemoryManager> mems = new ArrayList<>();
+    private Map<Integer, List<GPUMemoryManager>> memMap = new HashMap<>();
+    private AttributeSet attributes;
+
     private Map<ChunkCoordIntPair, NeoRegion> loadedRegionsMap = new HashMap<>();
-    
+    private List<NeoRegion> loadedRegionsList = new ArrayList<>();
+
     public World world;
-    
+
     // Eye position in world space
     private double eyePosX;
     private double eyePosY;
     private double eyePosZ;
-    
+
     // Eye position in world space, transformed by model-view matrix (takes third person camera offset into account)
     private double eyePosXT;
     private double eyePosYT;
     private double eyePosZT;
-    
+
     // eyePos?T divided by 16 
     int eyePosXTDiv;
     int eyePosYTDiv;
     int eyePosZTDiv;
-    
-    private int renderedMeshes, renderedQuads;
+
+    private int renderedMeshesRender, renderedPolygonsRender;
+    private int renderedMeshesShadow, renderedPolygonsShadow;
     private int frameCount;
-    
+
     public NeoRenderer(World world) {
         this.world = world;
         if (shouldRenderInWorld(world)) {
             hasInited = init();
         }
-        
+
         renderWorld = true;
         rendererActive = true;
     }
-    
+
     Vector4f transformedOrigin = new Vector4f();
-    
-    public void preRenderSortedRenderers(int renderPass, double alpha, WorldRenderer[] sortedWorldRenderers) {
-        if (hasInited) {
-            if (renderPass == 0) {
-                renderedMeshes = 0;
-                renderedQuads = 0;
-                
-                mainLoop();
-                if (Minecraft.getMinecraft().currentScreen == null) {
-                    handleKeyboard();
-                }
-                if (mem.getCoherenceRate() < 0.95f || frameCount % 4 == 0) {
-                    mem.runGC(false);
-                }
-                
-                if (rendererActive && renderWorld) {
-                    updateGLValues();
-                    
-                    transformedOrigin.set(0, 0, 0, 1);
-                    Matrix4f.transform(modelViewMatrixInv, transformedOrigin, transformedOrigin);
-                    
-                    Entity rve = Minecraft.getMinecraft().renderViewEntity;
-                    
-                    eyePosX = rve.lastTickPosX + (rve.posX - rve.lastTickPosX) * alpha;
-                    // eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + rve.getEyeHeight();
-                    eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + 0.12F;
-                    eyePosZ = rve.lastTickPosZ + (rve.posZ - rve.lastTickPosZ) * alpha;
-                    
-                    eyePosXT = eyePosX + transformedOrigin.x;
-                    eyePosYT = eyePosY + transformedOrigin.y;
-                    eyePosZT = eyePosZ + transformedOrigin.z;
-                    
-                    eyePosXTDiv = Math.floorDiv((int)Math.floor(eyePosXT), 16);
-                    eyePosYTDiv = Math.floorDiv((int)Math.floor(eyePosYT), 16);
-                    eyePosZTDiv = Math.floorDiv((int)Math.floor(eyePosZT), 16);
-                    
-                    sort(frameCount % 100 == 0, frameCount % NeodymiumConfig.sortFrequency.getIntegerValue() == 0);
-                    
-                    updateMeshes();
-                    initIndexBuffers();
-                }
-                
-                frameCount++;
-            }
-            
-            if (rendererActive && renderWorld) {
-                Minecraft.getMinecraft().entityRenderer.enableLightmap(alpha);
-                
-                render(renderPass, alpha);
-                
-                Minecraft.getMinecraft().entityRenderer.disableLightmap(alpha);
-            }
+
+
+    private int gcCounter = 0;
+    public int preRenderSortedRenderers(int renderPass, double alpha, WorldRenderer[] sortedWorldRenderers) {
+        if (!hasInited)
+            return 0;
+
+        final Minecraft mc = Minecraft.getMinecraft();
+        final boolean opaquePass = renderPass == 0;
+        final boolean isShadowPass = Compat.isShadersShadowPass();
+        final boolean shouldRender = rendererActive && renderWorld;
+
+        if (isFirstPass) {
+            renderedMeshesRender = 0;
+            renderedPolygonsRender = 0;
+            renderedMeshesShadow = 0;
+            renderedPolygonsShadow = 0;
+
+            mainLoop();
+            if (mc.currentScreen == null)
+                handleKeyboard();
         }
+
+        var rendered = 0;
+        if (shouldRender) {
+            if (opaquePass) {
+                updateGLValues();
+                updateEyePos(alpha);
+
+                if (!isShadowPass)
+                    sortMeshes(frameCount % 100 == 0, frameCount % NeodymiumConfig.sortFrequency.getIntegerValue() == 0);
+
+                initIndexBuffers(isShadowPass);
+            }
+
+            if (isFirstPass && !Compat.keepRenderListLogic() && !Compat.isFalseTweaksModPresent())
+                updateRenderGlobalStats();
+
+            rendered = render(renderPass, alpha);
+        }
+
+        isFirstPass = false;
+        return rendered;
     }
-    
+
+    private void updateEyePos(double alpha) {
+        transformedOrigin.set(0, 0, 0, 1);
+        Matrix4f.transform(modelViewMatrixInv, transformedOrigin, transformedOrigin);
+
+        final EntityLivingBase rve = Minecraft.getMinecraft().renderViewEntity;
+
+        eyePosX = rve.lastTickPosX + (rve.posX - rve.lastTickPosX) * alpha;
+        eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + rve.getEyeHeight();
+        eyePosZ = rve.lastTickPosZ + (rve.posZ - rve.lastTickPosZ) * alpha;
+
+        eyePosXT = eyePosX + transformedOrigin.x;
+        eyePosYT = eyePosY + transformedOrigin.y;
+        eyePosZT = eyePosZ + transformedOrigin.z;
+
+        eyePosXTDiv = Math.floorDiv((int) Math.floor(eyePosXT), 16);
+        eyePosYTDiv = Math.floorDiv((int) Math.floor(eyePosYT), 16);
+        eyePosZTDiv = Math.floorDiv((int) Math.floor(eyePosZT), 16);
+    }
+
     public void onRenderTickEnd() {
         if (Neodymium.isActive()) {
             if (reloadPending) {
                 Minecraft.getMinecraft().renderGlobal.loadRenderers();
+                return;
             }
-            if (showMemoryDebugger && mem != null) {
-                GuiHelper.begin();
-                mem.drawInfo();
-                GuiHelper.end();
+
+            if (gcCounter % 4 == 0) {
+                for (final GPUMemoryManager mem : mems)
+                    mem.runGC(false);
             }
+            gcCounter++;
+
+            if (showMemoryDebugger) {
+                int yOff = 20;
+                boolean drawing = false;
+                for (final GPUMemoryManager mem : mems) {
+                    if (mem != null) {
+                        if (!drawing) {
+                            drawing = true;
+                            GuiHelper.begin();
+                        }
+                        yOff = mem.drawDebugInfo(yOff) + 10;
+                    }
+                }
+                if (drawing)
+                    GuiHelper.end();
+            }
+
+            isFirstPass = true;
         } else if (destroyPending) {
             destroy();
             destroyPending = false;
@@ -175,62 +193,144 @@ public class NeoRenderer {
             Minecraft.getMinecraft().renderGlobal.loadRenderers();
         }
     }
-    
-    private void sort(boolean pass0, boolean pass1) {
-        if (pass0) {
-            sentMeshes[0].sort(DISTANCE_COMPARATOR.setOrigin(eyePosX, eyePosY, eyePosZ).setInverted(false));
-        }
-        if (pass1) {
-            sentMeshes[1].sort(DISTANCE_COMPARATOR.setOrigin(eyePosX, eyePosY, eyePosZ).setInverted(true));
-        }
-    }
-    
-    private void updateMeshes() {
-        for(List<Mesh> list : sentMeshes) {
-            for(Mesh mesh : list) {
-                mesh.update();
+
+    private void sortMeshes(boolean pass0, boolean pass1) {
+        for (final GPUMemoryManager mem: mems) {
+            for (NeoRegion r : loadedRegionsMap.values()) {
+                r.getRenderData(mem).sort(eyePosX, eyePosY, eyePosZ, pass0, pass1);
             }
         }
     }
-    
-    private void initIndexBuffers() {
-        for (int i = 0; i < 2; i++) {
-            piFirst[i].limit(MAX_MESHES);
-            piCount[i].limit(MAX_MESHES);
-            for (Mesh mesh : sentMeshes[i]) {
-                WorldRenderer wr = ((ChunkMesh)mesh).wr;
-                if (mesh.visible && wr.isVisible && shouldRenderMesh(mesh)) {
-                    int meshes = mesh.writeToIndexBuffer(piFirst[i], piCount[i], eyePosXTDiv, eyePosYTDiv, eyePosZTDiv, i);
-                    renderedMeshes += meshes;
-                    for (int j = piCount[i].position() - meshes; j < piCount[i].position(); j++) {
-                        renderedQuads += piCount[i].get(j) / 4;
+
+    private boolean isRendererVisible(WorldRenderer wr, boolean shadowPass) {
+        return shadowPass || wr.isVisible;
+    }
+
+    private void initIndexBuffers(boolean shadowPass) {
+        loadedRegionsList.clear();
+        loadedRegionsList.addAll(loadedRegionsMap.values());
+        loadedRegionsList.sort(Comparators.REGION_DISTANCE_COMPARATOR.setOrigin(eyePosX, eyePosY, eyePosZ));
+
+        for (final GPUMemoryManager mem: mems) {
+            mem.piFirst.clear();
+            mem.piCount.clear();
+            int order = mem.pass == 0 ? 1 : -1;
+            for (int regionI = order == 1 ? 0 : loadedRegionsList.size() - 1; regionI >= 0 && regionI < loadedRegionsList.size(); regionI += order) {
+                NeoRegion.RenderData region = loadedRegionsList.get(regionI).getRenderData(mem);
+                region.batchFirst = mem.piFirst.position();
+                for (Mesh mesh : region.getSentMeshes()) {
+                    WorldRenderer wr = ((ChunkMesh) mesh).wr;
+                    if ((shadowPass || wr.isInFrustum) && mesh.visible && isRendererVisible(wr, shadowPass) && shouldRenderMesh(mesh)) {
+                        if (mem.piFirst.position() >= mem.piFirst.limit() - 16) {
+                            mem.growIndexBuffers();
+                        }
+                        int meshes = mesh.writeToIndexBuffer(mem.piFirst, mem.piCount, eyePosXTDiv, eyePosYTDiv, eyePosZTDiv, mem.pass);
+                        if (shadowPass) {
+                            renderedMeshesShadow += meshes;
+                        } else {
+                            renderedMeshesRender += meshes;
+                        }
+                        for (int j = mem.piCount.position() - meshes; j < mem.piCount.position(); j++) {
+                            final int count = mem.piCount.get(j) / mem.verticesPerPolygon;
+                            if (shadowPass) {
+                                renderedPolygonsShadow += count;
+                            } else {
+                                renderedPolygonsRender += count;
+                            }
+                        }
+                    }
+                    if(Compat.isSpeedupAnimationsEnabled() && !Compat.keepRenderListLogic()) {
+                        // Hodgepodge hooks this method to decide what animations to play, make sure it runs
+                        wr.getGLCallListForPass(mem.pass);
                     }
                 }
+                region.batchLimit = mem.piFirst.position();
             }
-            piFirst[i].flip();
-            piCount[i].flip();
+            mem.piFirst.flip();
+            mem.piCount.flip();
         }
     }
-    
+
     private boolean shouldRenderMesh(Mesh mesh) {
-        if((NeodymiumConfig.maxMeshesPerFrame.getIntegerValue() == -1 || renderedMeshes < NeodymiumConfig.maxMeshesPerFrame.getIntegerValue())) {
-            return (!isFogEnabled() && !NeodymiumConfig.fogOcclusionWithoutFog.getBooleanValue())
-                    || NeodymiumConfig.fogOcclusion.getBooleanValue() == !NeodymiumConfig.fogOcclusion.getBooleanValue()
-                    || mesh.distSq(
+        if (Compat.isShadersShadowPass())
+            return true;
+        if ((NeodymiumConfig.maxMeshesPerFrame.getIntegerValue() == -1
+                || renderedMeshesRender < NeodymiumConfig.maxMeshesPerFrame.getIntegerValue())) {
+            if ((!isFogEnabled() && !NeodymiumConfig.fogOcclusionWithoutFog.getBooleanValue())
+//                || Config.fogOcclusion == !Config.fogOcclusion
+                || mesh.distSq(
                     eyePosX / 16.0,
                     mesh.y + 0.5,
                     eyePosZ / 16.0)
-                    < Math.pow((fogStartEnd.get(1)) / 16.0 + 1.0, 2);
+                   < Math.pow((fogStartEnd.get(1)) / 16.0 + 1.0, 2)) {
+                return true;
+            }
         }
         return false;
     }
-    
+
+
+
+    private static class DelayedTask implements Comparable<DelayedTask> {
+        public final int timestamp;
+        public final Runnable task;
+        private final int idx;
+        private static final AtomicInteger IIDX = new AtomicInteger();
+        public DelayedTask(int timestamp, Runnable task) {
+            this.timestamp = timestamp;
+            this.task = task;
+            idx = IIDX.getAndIncrement();
+        }
+        @Override
+        public int compareTo(DelayedTask o) {
+            if (timestamp == o.timestamp) {
+                return Integer.compare(idx, o.idx);
+            }
+            return Integer.compare(timestamp, o.timestamp);
+        }
+    }
+    private static int frameCounter = 0;
+    private static final TreeSet<DelayedTask> tasks = new TreeSet<>();
+
+    public static void submitTask(Runnable task, int delayFrames) {
+        tasks.add(new DelayedTask(frameCounter + delayFrames, task));
+    }
+
+    private static void updateRenderGlobalStats() {
+        // Normally renderSortedRenderers does this, but we cancelled it
+
+        RenderGlobal rg = Minecraft.getMinecraft().renderGlobal;
+
+        for(WorldRenderer wr : rg.sortedWorldRenderers) {
+            if(wr != null) {
+                ++rg.renderersLoaded;
+                if (wr.skipRenderPass[0]) {
+                    ++rg.renderersSkippingRenderPass;
+                } else if (!wr.isInFrustum) {
+                    ++rg.renderersBeingClipped;
+                } else if (rg.occlusionEnabled && !wr.isVisible) {
+                    ++rg.renderersBeingOccluded;
+                } else {
+                    ++rg.renderersBeingRendered;
+                }
+            }
+        }
+    }
+
     private void mainLoop() {
-        if (((NetClientHandlerAccessor)((PlayerControllerMPAccessor) Minecraft.getMinecraft().playerController).getNetClientHandler()).isDoneLoadingTerrain()) {
-            for (Iterator<Entry<ChunkCoordIntPair, NeoRegion>> it = loadedRegionsMap.entrySet().iterator(); it.hasNext();) {
+        if (!tasks.isEmpty()) {
+            final DelayedTask task = tasks.first();
+            if (task.timestamp - frameCounter < 0) {
+                tasks.pollFirst();
+                task.task.run();
+            }
+        }
+        frameCounter++;
+        if (Minecraft.getMinecraft().playerController.netClientHandler.doneLoadingTerrain) {
+            for (Iterator<Entry<ChunkCoordIntPair, NeoRegion>> it = loadedRegionsMap.entrySet().iterator(); it.hasNext(); ) {
                 Entry<ChunkCoordIntPair, NeoRegion> kv = it.next();
                 NeoRegion v = kv.getValue();
-                
+
                 if (v.shouldDelete()) {
                     v.destroy();
                     it.remove();
@@ -240,9 +340,12 @@ public class NeoRenderer {
             }
         }
     }
-    
+
+    @SuppressWarnings("removal")
     private void handleKeyboard() {
-        if (NeodymiumConfig.debugPrefix.getKeyCode() == 0 || (NeodymiumConfig.debugPrefix.getKeyCode() != -1 && Keyboard.isKeyDown(NeodymiumConfig.debugPrefix.getKeyCode()))) {
+        if (NeodymiumConfig.debugPrefix.getKeyCode() == 0
+                || (NeodymiumConfig.debugPrefix.getKeyCode() != -1
+                && Keyboard.isKeyDown(NeodymiumConfig.debugPrefix.getKeyCode()))) {
             if (CheatHelper.canCheat()) {
                 if (Keyboard.isKeyDown(Keyboard.KEY_F) && !wasDown[Keyboard.KEY_F]) {
                     rendererActive = !rendererActive;
@@ -275,230 +378,290 @@ public class NeoRenderer {
             wasDown[i] = Keyboard.isKeyDown(i);
         }
     }
-    
+
     FloatBuffer modelView = BufferUtils.createFloatBuffer(16);
     FloatBuffer projBuf = BufferUtils.createFloatBuffer(16);
     IntBuffer viewportBuf = BufferUtils.createIntBuffer(16);
-    //FloatBuffer projInvBuf = BufferUtils.createFloatBuffer(16);
+    FloatBuffer projInvBuf = BufferUtils.createFloatBuffer(16);
     FloatBuffer fogColorBuf = BufferUtils.createFloatBuffer(16);
     FloatBuffer fogStartEnd = BufferUtils.createFloatBuffer(2);
     Matrix4f modelViewMatrix = new Matrix4f();
     Matrix4f modelViewMatrixInv = new Matrix4f();
     Matrix4f projMatrix = new Matrix4f();
-    
-    private void render(int pass, double alpha) {
-        int shader = getShaderProgram(pass);
-        
-        if (shader == 0) return;
-        
-        glBindVertexArray(VAO);    
-        glUseProgram(shader);
-        updateUniforms(alpha, pass);
-        
+
+    private int render(int pass, double alpha) {
+        final List<GPUMemoryManager> mems = memMap.get(pass);
+        if (mems == null)
+            return 0;
+
+        if (!Compat.isOptiFineShadersEnabled()) {
+            int shader = getShaderProgram(pass);
+
+            if (shader == 0) return 0;
+            glUseProgram(shader);
+            updateUniforms(alpha, pass);
+        }
+
         if (isWireframeEnabled()) {
             GL11.glPolygonMode(GL11.GL_FRONT_AND_BACK, GL11.GL_LINE);
         }
-        glMultiDrawArrays(GL_QUADS, piFirst[pass], piCount[pass]);
+
+        int u_renderOffset = -1;
+        if (!Compat.isOptiFineShadersEnabled()) {
+            u_renderOffset = glGetUniformLocation(getShaderProgram(pass), "renderOffset");
+        }
+
+        final EntityRenderer er = Minecraft.getMinecraft().entityRenderer;
+        er.enableLightmap(alpha);
+
+        var rendered = 0;
+        for (final GPUMemoryManager mem: mems) {
+            glBindVertexArray(mem.VAO);
+            int oldLimit = mem.piFirst.limit();
+
+            int order = pass == 0 ? 1 : -1;
+            for (int regionI = order == 1 ? 0 : loadedRegionsList.size() - 1; regionI >= 0 && regionI < loadedRegionsList.size(); regionI += order) {
+                NeoRegion.RenderData region = loadedRegionsList.get(regionI).getRenderData(mem);
+                rendered += region.batchLimit - region.batchFirst;
+                Util.setPositionAndLimit(mem.piFirst, region.batchFirst, region.batchLimit);
+                Util.setPositionAndLimit(mem.piCount, region.batchFirst, region.batchLimit);
+
+                if (Compat.isOptiFineShadersEnabled()) {
+                    GL11.glMatrixMode(GL_MODELVIEW);
+
+                    final float offsetX = (float) (region.originX - eyePosX);
+                    final float offsetY = (float) ((region.originY - eyePosY) + 0.12);
+                    final float offsetZ = (float) (region.originZ - eyePosZ);
+
+                    GL11.glPushMatrix();
+                    GL11.glTranslatef(offsetX, offsetY, offsetZ);
+                } else {
+                    glUniform3f(u_renderOffset, (float) (region.originX - eyePosX), (float) (region.originY - eyePosY), (float) (region.originZ - eyePosZ));
+                }
+
+                glMultiDrawArrays(mem.drawMode, mem.piFirst, mem.piCount);
+
+                if (Compat.isOptiFineShadersEnabled())
+                    GL11.glPopMatrix();
+            }
+            Util.setPositionAndLimit(mem.piFirst, 0, oldLimit);
+            Util.setPositionAndLimit(mem.piCount, 0, oldLimit);
+        }
+
         if (isWireframeEnabled()) {
             GL11.glPolygonMode(GL11.GL_FRONT_AND_BACK, GL11.GL_FILL);
         }
-        
+
+        if (!Compat.isOptiFineShadersEnabled()) {
+            glUseProgram(0);
+        }
+
         glBindVertexArray(0);
-        glUseProgram(0);
+
+        er.disableLightmap(alpha);
+
+        return rendered;
     }
-    
+
     private void updateGLValues() {
         glGetFloat(GL_MODELVIEW_MATRIX, modelView);
-        
+
         glGetFloat(GL_PROJECTION_MATRIX, projBuf);
-        
+
         glGetInteger(GL_VIEWPORT, viewportBuf);
-        
+
         projMatrix.load(projBuf);
         projBuf.flip();
         projMatrix.invert();
-        //projMatrix.store(projInvBuf);
-        //projInvBuf.flip();
-        
+        projMatrix.store(projInvBuf);
+        projInvBuf.flip();
+
         modelViewMatrix.load(modelView);
         modelView.flip();
         modelViewMatrixInv.load(modelViewMatrix).invert();
-        
+
         fogColorBuf.limit(16);
         glGetFloat(GL_FOG_COLOR, fogColorBuf);
         fogColorBuf.limit(4);
-        
+
         fogStartEnd.put(glGetFloat(GL_FOG_START));
         fogStartEnd.put(glGetFloat(GL_FOG_END));
-        
+
         fogStartEnd.flip();
+
+        fogEnabled = GL11.glIsEnabled(GL11.GL_FOG) && !OFUtil.isFogOff();
     }
-    
+
     private void updateUniforms(double alpha, int pass) {
         int shaderProgram = getShaderProgram(pass);
-        
         int u_modelView = glGetUniformLocation(shaderProgram, "modelView");
         int u_proj = glGetUniformLocation(shaderProgram, "proj");
         int u_playerPos = glGetUniformLocation(shaderProgram, "playerPos");
-        int u_light = glGetUniformLocation(shaderProgram, "lightTex");
+        int u_light = 0, u_light_r = 0, u_light_g = 0, u_light_b = 0;
+        if (Compat.isRPLEModPresent()) {
+            u_light_r = glGetUniformLocation(shaderProgram, "lightTexR");
+            u_light_g = glGetUniformLocation(shaderProgram, "lightTexG");
+            u_light_b = glGetUniformLocation(shaderProgram, "lightTexB");
+        } else {
+            u_light = glGetUniformLocation(shaderProgram, "lightTex");
+        }
         int u_viewport = glGetUniformLocation(shaderProgram, "viewport");
-        //int u_projInv = glGetUniformLocation(shaderProgram, "projInv");
+        int u_projInv = glGetUniformLocation(shaderProgram, "projInv");
         int u_fogColor = glGetUniformLocation(shaderProgram, "fogColor");
         int u_fogStartEnd = glGetUniformLocation(shaderProgram, "fogStartEnd");
         int u_fogMode = glGetUniformLocation(shaderProgram, "fogMode");
         int u_fogDensity = glGetUniformLocation(shaderProgram, "fogDensity");
-        
+
         glUniformMatrix4(u_modelView, false, modelView);
         glUniformMatrix4(u_proj, false, projBuf);
-        //glUniformMatrix4(u_projInv, false, projInvBuf);
-        glUniform4f(u_viewport, viewportBuf.get(0),viewportBuf.get(1),viewportBuf.get(2),viewportBuf.get(3));
+        glUniformMatrix4(u_projInv, false, projInvBuf);
+        glUniform4f(u_viewport, viewportBuf.get(0), viewportBuf.get(1), viewportBuf.get(2), viewportBuf.get(3));
         glUniform4(u_fogColor, fogColorBuf);
         glUniform2(u_fogStartEnd, fogStartEnd);
         glUniform1i(u_fogMode, glGetInteger(GL_FOG_MODE));
         glUniform1f(u_fogDensity, glGetFloat(GL_FOG_DENSITY));
-        
-        glUniform3f(u_playerPos, (float)eyePosX, (float)eyePosY, (float)eyePosZ);
-        
-        glUniform1i(u_light, 1);
-        
+
+        glUniform3f(u_playerPos, (float) eyePosX, (float) eyePosY, (float) eyePosZ);
+
+        if (Compat.isRPLEModPresent()) {
+            //TODO connect to RPLE gl api (once that exists)
+            // For now we just use the RPLE default texture indices
+            glUniform1i(u_light_r, 1);
+            glUniform1i(u_light_g, 2);
+            glUniform1i(u_light_b, 3);
+        } else {
+            glUniform1i(u_light, 1);
+        }
+
         modelView.position(0);
         projBuf.position(0);
         viewportBuf.position(0);
-        //projInvBuf.position(0);
+        projInvBuf.position(0);
         fogColorBuf.position(0);
         fogStartEnd.position(0);
     }
-    
+
+    /**
+     * @implSpec The attributes here need to be kept in sync with {@link makamys.neodymium.renderer.compat.RenderUtil#writeMeshPolygonToBuffer(int[], int, BufferWriter, int, int)}
+     */
     public boolean init() {
-        // The average mesh is 60 KB. Let's be safe and assume 8 KB per mesh.
-        // This means 1 MB of index data per 512 MB of VRAM.
-        MAX_MESHES = NeodymiumConfig.VRAMSize.getIntegerValue() * 128;
-        
+
+        attributes = new AttributeSet();
+
+        Neodymium.util.initVertexAttributes(attributes);
+
         reloadShader();
-        
-        VAO = glGenVertexArrays();
-        glBindVertexArray(VAO);
-        
-        mem = new GPUMemoryManager();
-        
-        glBindBuffer(GL_ARRAY_BUFFER, mem.VBO);
-        
-        int stride = MeshQuad.getStride();
-        
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0);
-        glVertexAttribPointer(1, 2, NeodymiumConfig.shortUV.getBooleanValue() ? GL_UNSIGNED_SHORT : GL_FLOAT, false, stride, 3 * 4);
-        int uvEnd = NeodymiumConfig.shortUV.getBooleanValue() ? 4 * 4 : 5 * 4;
-        glVertexAttribPointer(2, 2, GL_SHORT, false, stride, uvEnd);
-        glVertexAttribPointer(3, 4, GL_UNSIGNED_BYTE, false, stride, uvEnd + 4);
-        if (NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
-            glVertexAttribPointer(4, 4, GL_UNSIGNED_BYTE, false, stride, uvEnd + 2 * 4);
-        }
-        
-        glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
-        glEnableVertexAttribArray(2);
-        glEnableVertexAttribArray(3);
-        if (NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
-            glEnableVertexAttribArray(4);
-        }
-        
-        for(int i = 0; i < 2; i++) {
-            piFirst[i] = BufferUtils.createIntBuffer(MAX_MESHES);
-            piFirst[i].flip();
-            piCount[i] = BufferUtils.createIntBuffer(MAX_MESHES);
-            piCount[i].flip();
-        }
-        
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
-        
         return true;
     }
-    
-    public void reloadShader(int pass) {
+
+    private GPUMemoryManager initMemoryManager(int pass, int drawMode, int verticesPerPolygon) throws Exception {
+        final GPUMemoryManager mem = new GPUMemoryManager(mems.size(), pass, drawMode, verticesPerPolygon);
+        mems.add(mem);
+        memMap.computeIfAbsent(pass, p -> new ArrayList<>()).add(mem);
+
+        glBindVertexArray(mem.VAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, mem.VBO);
+
+        Neodymium.util.applyVertexAttributes(attributes);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+        return mem;
+    }
+
+    public int getStride() {
+        return attributes.stride();
+    }
+
+    public void reloadShader(int pass, AttributeSet attributeSet) {
         for (int hasFog = 0; hasFog <= 1; hasFog++) {
-            Set<String> defines = new HashSet<>();
+            Map<String, String> defines = new HashMap<>();
             if (hasFog == 1) {
-                defines.add("RENDER_FOG");
-            }
-            if(NeodymiumConfig.simplifyChunkMeshes.getBooleanValue()) {
-                defines.add("SIMPLIFY_MESHES");
+                defines.put("RENDER_FOG", "");
             }
             if (NeodymiumConfig.shortUV.getBooleanValue()) {
-                defines.add("SHORT_UV");
+                defines.put("SHORT_UV", "");
+            }
+            if (Compat.isRPLEModPresent()) {
+                defines.put("RPLE", "");
             }
             if (pass == 0) {
-                defines.add("PASS_0");
+                defines.put("PASS_0", "");
             }
-           
+
+            attributeSet.addDefines(defines);
+
             boolean errors = false;
-            
+
             int vertexShader;
             vertexShader = glCreateShader(GL_VERTEX_SHADER);
-            
+
             glShaderSource(vertexShader, Preprocessor.preprocess(Util.readFile("shaders/chunk.vert"), defines));
             glCompileShader(vertexShader);
-            
+
             if (glGetShaderi(vertexShader, GL_COMPILE_STATUS) == 0) {
                 System.out.println("Error compiling vertex shader: " + glGetShaderInfoLog(vertexShader, 256));
                 errors = true;
             }
-            
+
             int fragmentShader;
             fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-            
+
             glShaderSource(fragmentShader, Preprocessor.preprocess(Util.readFile("shaders/chunk.frag"), defines));
             glCompileShader(fragmentShader);
-            
+
             if (glGetShaderi(fragmentShader, GL_COMPILE_STATUS) == 0) {
                 System.out.println("Error compiling fragment shader: " + glGetShaderInfoLog(fragmentShader, 256));
                 errors = true;
             }
-            
+
             int newShaderProgram = glCreateProgram();
             glAttachShader(newShaderProgram, vertexShader);
             glAttachShader(newShaderProgram, fragmentShader);
             glLinkProgram(newShaderProgram);
-            
+
             if (glGetProgrami(newShaderProgram, GL_LINK_STATUS) == 0) {
                 System.out.println("Error linking shader: " + glGetShaderInfoLog(newShaderProgram, 256));
                 errors = true;
             }
-            
+
             if (!errors) {
                 ((hasFog == 1) ? shaderProgramsFog : shaderProgramsNoFog)[pass] = newShaderProgram;
             }
-            
+
             glDeleteShader(vertexShader);
             glDeleteShader(fragmentShader);
         }
     }
-       
+
     public void reloadShader() {
-        reloadShader(0);
-        reloadShader(1);
+        reloadShader(0, attributes);
+        reloadShader(1, attributes);
     }
-    
+
     public void destroy() {
         if (!hasInited) return;
-        
+
         glDeleteProgram(shaderProgramsFog[0]);
         glDeleteProgram(shaderProgramsFog[1]);
         glDeleteProgram(shaderProgramsNoFog[0]);
         glDeleteProgram(shaderProgramsNoFog[1]);
-        glDeleteVertexArrays(VAO);
-        mem.destroy();
-        
-        ChunkMesh.instances = 0;
-        ChunkMesh.usedRAM = 0;
+        for (final GPUMemoryManager mem: mems) {
+            mem.destroy();
+        }
+
+        for (final NeoRegion region: loadedRegionsList) {
+            region.destroy();
+        }
     }
-    
+
     public void onWorldRendererChanged(WorldRenderer wr, WorldRendererChange change) {
         int x = Math.floorDiv(wr.posX, 16);
         int y = Math.floorDiv(wr.posY, 16);
         int z = Math.floorDiv(wr.posZ, 16);
         NeoChunk neoChunk = getNeoChunk(x, z);
-        
+
         neoChunk.isSectionVisible[y] = change == WorldRendererChange.VISIBLE;
         if (change == WorldRendererChange.DELETED) {
             removeMesh(neoChunk.chunkMeshes[y]);
@@ -510,48 +673,52 @@ public class NeoRenderer {
         }
         neoChunkChanged(neoChunk);
     }
-    
+
     public void onWorldRendererPost(WorldRenderer wr, boolean sort) {
         int x = Math.floorDiv(wr.posX, 16);
         int y = Math.floorDiv(wr.posY, 16);
         int z = Math.floorDiv(wr.posZ, 16);
-        
+
         if (Minecraft.getMinecraft().theWorld.getChunkFromChunkCoords(x, z).isChunkLoaded) {
             NeoChunk neoChunk = getNeoChunk(x, z);
-            neoChunk.isSectionVisible[y] = ((IWorldRenderer)wr).neodymium$isDrawn();
-            neoChunk.putChunkMeshes(y, ((IWorldRenderer)wr).neodymium$getChunkMeshes(), sort);
+            neoChunk.isSectionVisible[y] = ((NeodymiumWorldRenderer) wr).nd$isDrawn();
+            neoChunk.putChunkMeshes(y, ((NeodymiumWorldRenderer) wr).nd$getChunkMeshes(), sort);
         }
     }
-    
+
     public void onRenderFog() {
         forceRenderFog = false;
     }
-    
+
     private NeoChunk getNeoChunk(int chunkX, int chunkZ) {
         return getRegionContaining(chunkX, chunkZ).getChunkAbsolute(chunkX, chunkZ);
     }
-    
+
     private NeoRegion getRegionContaining(int chunkX, int chunkZ) {
-        ChunkCoordIntPair key = new ChunkCoordIntPair(Math.floorDiv(chunkX , 32), Math.floorDiv(chunkZ, 32));
+        int regionX = Math.floorDiv(chunkX, NeoRegion.SIZE);
+        int regionZ = Math.floorDiv(chunkZ, NeoRegion.SIZE);
+
+        ChunkCoordIntPair key = new ChunkCoordIntPair(regionX, regionZ);
+
         NeoRegion region = loadedRegionsMap.get(key);
         if (region == null) {
-            region = NeoRegion.load(Math.floorDiv(chunkX , 32), Math.floorDiv(chunkZ , 32));
+            region = NeoRegion.load(regionX, regionZ);
             loadedRegionsMap.put(key, region);
         }
         return region;
     }
-    
+
     public void setVisible(NeoChunk chunk, boolean visible) {
         setVisible(chunk, visible, false);
     }
-    
+
     public void setVisible(NeoChunk neoChunk, boolean visible, boolean forceCheck) {
         if (!forceCheck && visible == neoChunk.visible) return;
-        
+
         neoChunk.visible = visible;
         neoChunkChanged(neoChunk);
     }
-    
+
     public void neoChunkChanged(NeoChunk neoChunk) {
         int newLOD = neoChunk.hasChunkMeshes() ? 2 : 0;
         for (int y = 0; y < 16; y++) {
@@ -567,32 +734,64 @@ public class NeoRenderer {
                             setMeshVisible(cm, false);
                         }
                     }
+                    uploadMeshToGPU(cm);
                 }
             }
         }
     }
-    
+
+
+    protected void uploadMeshToGPU(Mesh mesh) {
+        if (mesh.gpuStatus != GPUStatus.UNSENT || mesh.buffer == null || mesh.verticesPerPolygon == -1) {
+            return;
+        }
+        boolean sent = false;
+        GPUMemoryManager mem = null;
+        final List<GPUMemoryManager> memArr = memMap.get(mesh.pass);
+        if (memArr != null)
+            for (GPUMemoryManager gpuMemoryManager : memArr) {
+                mem = gpuMemoryManager;
+                sent = mem.uploadMesh(mesh);
+                if (sent)
+                    break;
+            }
+        if (!sent) {
+            try {
+                mem = initMemoryManager(mesh.pass, mesh.drawMode, mesh.verticesPerPolygon);
+            } catch (Exception e) {
+                ChatUtil.showNeoChatMessage("Could not allocate memory buffer: " + e.getMessage(), ChatUtil.MessageVerbosity.ERROR);
+                e.printStackTrace();
+                Neodymium.renderer.destroyPending = true;
+                return;
+            }
+            mem.uploadMesh(mesh);
+        }
+        NeoRegion region = getRegionContaining(mesh.x, mesh.z);
+        region.getRenderData(mem).getSentMeshes().add(mesh);
+        mesh.containingRegion = region;
+    }
+
     protected void setMeshVisible(Mesh mesh, boolean visible) {
         if (mesh == null) return;
-        
+
         if (mesh.visible != visible) {
             mesh.visible = visible;
-            
-            if (mesh.gpuStatus == GPUStatus.UNSENT) {
-                mem.sendMeshToGPU(mesh);
-                sentMeshes[mesh.pass].add(mesh);
-            }
         }
     }
-    
+
     public void removeMesh(Mesh mesh) {
         if (mesh == null) return;
-        
-        mem.deleteMeshFromGPU(mesh);
-        sentMeshes[mesh.pass].remove(mesh);
+
+        final GPUMemoryManager mem = mesh.attachedManager;
+        if (mem != null) {
+            mesh.attachedManager.deleteMesh(mesh);
+            if (mesh.containingRegion != null) {
+                mesh.containingRegion.getRenderData(mem).getSentMeshes().remove(mesh);
+            }
+        }
         setMeshVisible(mesh, false);
     }
-    
+
     public List<String> getDebugText(boolean statusCommand) {
         List<String> text = new ArrayList<>();
         text.add(
@@ -600,11 +799,17 @@ public class NeoRenderer {
                 + (statusCommand ? EnumChatFormatting.LIGHT_PURPLE : "")
                 + "Neodymium " + VERSION
         );
-        text.addAll(mem.getDebugText());
         text.addAll(Arrays.asList(
-                "Meshes: " + ChunkMesh.instances + " (" + ChunkMesh.usedRAM / 1024 / 1024 + "MB)",
-                "Rendered: " + renderedMeshes + " (" + renderedQuads / 1000 + "KQ)"
-        ));
+                "Meshes: " + ChunkMesh.instances.get() + " (" + ChunkMesh.usedRAM.get() / 1024 / 1024 + "MB)",
+                "Rendered: " + renderedMeshesRender + " (" + renderedPolygonsRender / 1000 + "KQ)"
+                                 ));
+        if (Compat.isOptiFineShadersEnabled()) {
+            text.add("Shadow Rendered: " + renderedMeshesShadow + " (" + renderedPolygonsShadow / 1000 + "KQ)");
+        }
+        text.add("VRAM buffers:");
+        for (final GPUMemoryManager mem : mems) {
+            text.addAll(mem.debugText());
+        }
         if (rendererSpeedup > 0) {
             text.add(EnumChatFormatting.YELLOW + "(!) Renderer speedup active");
         }
@@ -616,115 +821,32 @@ public class NeoRenderer {
         }
         return text;
     }
-    
+
     private int getShaderProgram(int pass) {
         return ((forceRenderFog || isFogEnabled()) ? shaderProgramsFog : shaderProgramsNoFog)[pass];
     }
-    
-    private static boolean isFogEnabled() {
+
+    private boolean isFogEnabled() {
+//        switch (Config.renderFog) {
+//            case TRUE:
+//                return true;
+//            case FALSE:
+//                return false;
+//            default:
+//                return fogEnabled;
+//        }
         return NeodymiumConfig.renderFog.getBooleanValue();
-//        return switch (NeodymiumConfig.renderFog) {
-//            case TRUE -> true;
-//            case FALSE -> false;
-//            default -> GL11.glIsEnabled(GL11.GL_FOG) && !OFUtil.isFogOff();
-//        };
     }
-    
+
     private boolean shouldRenderInWorld(World world) {
         return world != null;
     }
-    
+
     private static boolean isWireframeEnabled() {
         return NeodymiumConfig.wireframe.getBooleanValue() && CheatHelper.canCheat();
     }
-    
-    public static class NeoChunkComparator implements Comparator<NeoChunk> {
-        Entity player;
-        
-        public NeoChunkComparator(Entity player) {
-            this.player = player;
-        }
-        
-        @Override
-        public int compare(NeoChunk p1, NeoChunk p2) {
-            int distSq1 = distSq(p1);
-            int distSq2 = distSq(p2);
-            return Integer.compare(distSq1, distSq2);
-        }
-        
-        int distSq(NeoChunk p) {
-            return (int)(
-                    Math.pow(((p.x * 16) - player.getChunkAddedTo().xPosition), 2) +
-                    Math.pow(((p.z * 16) - player.getChunkAddedTo().zPosition), 2)
-                    );
-        }
-    }
-    
-    public static class ChunkCoordDistanceComparator implements Comparator<ChunkCoordIntPair> {
-        double x, y, z;
-        
-        public ChunkCoordDistanceComparator(double x, double y, double z) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-        }
-        
-        @Override
-        public int compare(ChunkCoordIntPair p1, ChunkCoordIntPair p2) {
-            int distSq1 = distSq(p1);
-            int distSq2 = distSq(p2);
-            return Integer.compare(distSq1, distSq2);
-        }
-        
-        int distSq(ChunkCoordIntPair p) {
-            return (int)(
-                    Math.pow(((p.chunkXPos * 16) - x), 2) +
-                    Math.pow(((p.chunkZPos * 16) - z), 2)
-                    );
-        }
-    }
-    
-    public static class MeshDistanceComparator implements Comparator<Mesh> {
-        double x, y, z;
-        boolean inverted;
-        
-        public Comparator<? super Mesh> setInverted(boolean inverted) {
-            this.inverted = inverted;
-            return this;
-        }
 
-        public MeshDistanceComparator setOrigin(double x, double y, double z) {
-            this.x = x / 16.0;
-            this.y = y / 16.0;
-            this.z = z / 16.0;
-            return this;
-        }
-
-        @Override
-        public int compare(Mesh a, Mesh b) {
-            if(a.pass < b.pass) {
-                return -1;
-            } else if(a.pass > b.pass) {
-                return 1;
-            } else {
-                double distSqA = a.distSq(x, y, z);
-                double distSqB = b.distSq(x, y, z);
-                
-                int mult = inverted ? -1 : 1;
-                
-                if(distSqA > distSqB) {
-                    return mult;
-                } else if(distSqA < distSqB) {
-                    return -1 * mult;
-                } else {
-                    return 0;
-                }
-            }
-        }
-        
-    }
-    
-    public enum WorldRendererChange {
+    public static enum WorldRendererChange {
         VISIBLE, INVISIBLE, DELETED
     }
 }

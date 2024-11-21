@@ -48,7 +48,7 @@ public class ChatUtil {
         shownChatMessages.clear();
     }
     
-    public enum MessageVerbosity {
+    public static enum MessageVerbosity {
         INFO, WARNING, ERROR
     }
     

@@ -1,9 +1,18 @@
 package makamys.neodymium.util;
 
+import net.fabricmc.loader.impl.FabricLoaderImpl;
+import net.minecraft.Minecraft;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -11,20 +20,12 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import net.fabricmc.loader.impl.FabricLoaderImpl;
-import net.xiaoyu233.fml.relaunch.Launch;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
-
-//import net.minecraft.launchwrapper.Launch;
-
 public class Util {
     
     private static boolean allowResourceOverrides = Boolean.parseBoolean(System.getProperty("neodymium.allowResourceOverrides", "false"));
     
     public static Path getResourcePath(String relPath) {
         if(allowResourceOverrides) {
-            // Launch.minecraftHome
             File overrideFile = new File(new File(FabricLoaderImpl.INSTANCE.getGameDir().toFile(), "neodymium/resources"), relPath);
             if(overrideFile.exists()) {
                 return overrideFile.toPath();
@@ -33,7 +34,7 @@ public class Util {
         
         try {
             URL resourceURL = Util.class.getClassLoader().getResource(relPath);
-
+            
             switch(resourceURL.getProtocol()) {
             case "jar":
                 String urlString = resourceURL.getPath();
@@ -87,30 +88,44 @@ public class Util {
     }
     
     public static double distSq(double x1, double y1, double z1, double x2, double y2, double z2) {
-        return Math.pow(x1 - x2, 2) +
-                Math.pow(y1 - y2, 2) +
-                Math.pow(z1 - z2, 2);
+        final double dX = x1 - x2;
+        final double dY = y1 - y2;
+        final double dZ = z1 - z2;
+        return dX * dX + dY * dY + dZ * dZ;
     }
-    
+
     public static void dumpTexture() {
-        int width = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_WIDTH);
-        int height = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_HEIGHT);
-        
-        System.out.println("Dumped " + width + "x" + height + " texture.");
-        
-        ByteBuffer buf = BufferUtils.createByteBuffer(4 * width * height);
-        GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, buf);
-        /*try {
-            // to convert to png:
-            // magick -size 512x256 -depth 8 out.rgba out.png
-            FileUtils.writeByteArrayToFile(new File("out.rgba"), Util.byteBufferToArray(buf));
+        final Minecraft mc = Minecraft.getMinecraft();
+        final Path workingPath = mc.mcDataDir.toPath();
+        final File terrainFile = workingPath.resolve("terrain.png").toFile();
+
+        final int width = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_WIDTH);
+        final int height = GL11.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_HEIGHT);
+
+        final ByteBuffer buf = BufferUtils.createByteBuffer(4 * width * height);
+        GL11.glGetTexImage(GL11.GL_TEXTURE_2D, 0, GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, buf);
+        try {
+            final BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            final IntBuffer intBuf = buf.asIntBuffer();
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    img.setRGB(x, y, intBuf.get());
+                }
+            }
+            ImageIO.write(img, "png", terrainFile);
         } catch (IOException e) {
+            ChatUtil.showNeoChatMessage("Failed to dump terrain texture", ChatUtil.MessageVerbosity.ERROR);
             e.printStackTrace();
-        }*/
-        System.out.println("Dump not implemented");
+        }
+        ChatUtil.showChatMessage("Dumped terrain texture to: " + terrainFile.getAbsolutePath());
     }
     
     public static int createBrightness(int sky, int block) {
         return sky << 20 | block << 4;
+    }
+    
+    public static void setPositionAndLimit(Buffer buffer, int position, int limit) {
+        buffer.position(position);
+        buffer.limit(limit);
     }
 }

@@ -5,9 +5,9 @@ import java.util.List;
 import makamys.neodymium.Neodymium;
 import net.minecraft.Entity;
 
-/** A container for the meshes that compose a chunk (16x256x16 region). It keeps track of which meshes should be made visible and which ones should not. */
+/** A container for the meshes that compose a chunk (16x256x16 region).
+ * It keeps track of which meshes should be made visible and which ones should not. */
 public class NeoChunk {
-	
 	int x, z;
 	int lod = 0;
 	boolean visible;
@@ -43,11 +43,14 @@ public class NeoChunk {
     		    if(chunkMeshes[cy * 2 + i] != null) {
     			    renderer.removeMesh(chunkMeshes[cy * 2 + i]);
     			    chunkMeshes[cy * 2 + i].destroy();
-    			} else {
+                    region.meshes--;
+                    dirty = true;
+    			}
+    		    if(newChunkMesh != null){
     			    region.meshes++;
+    			    dirty = true;
     			}
     		    chunkMeshes[cy * 2 + i] = newChunkMesh;
-    		    dirty = true;
 		    }
 		}
 		if(dirty) {

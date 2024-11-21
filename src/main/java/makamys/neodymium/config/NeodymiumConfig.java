@@ -41,6 +41,12 @@ public class NeodymiumConfig extends SimpleConfigs {
     // @ConfigBoolean(cat="render", def=false, com="Store texture coordinates as shorts instead of floats. Slightly reduces memory usage and might improve performance by small amount. Might affect visuals slightly, but it's only noticable if the texture atlas is huge.")
     public static ConfigBooleanChangeCallback shortUV = new ConfigBooleanChangeCallback("shortUV", false, "shortUV");
 
+    // @ConfigInt(cat="render", def=256,min=16,max=1024,com = "The size of the allocation chunks for opaque geometry (in Megabytes). Requires game restart to apply.")
+    public static ConfigInteger bufferSizePass0 = new ConfigInteger("bufferSizePass0", 256, 16, 1024, "bufferSizePass0");
+
+    // @ConfigInt(cat="render", def=64,min=16,max=1024,com = "The size of the allocation chunks for transparent geometry (in Megabytes). Requires game restart to apply.")
+    public static ConfigInteger bufferSizePass1 = new ConfigInteger("bufferSizePass1", 64, 16, 1024, "bufferSizePass1");
+
     // @ConfigInt(cat="render", def=1, min=1, max=Integer.MAX_VALUE, com="Interval (in frames) between the sorting of transparent meshes. Increasing this will reduce CPU usage, but also increase the likelyhood of graphical artifacts appearing when transparent chunks are loaded.")
     public static ConfigInteger sortFrequency = new ConfigInteger("sortFrequency", 1, 1, 200, "sortFrequency");
 
@@ -52,7 +58,7 @@ public class NeodymiumConfig extends SimpleConfigs {
 
     // @NeedsReload
     // @ConfigInt(cat="render", def=512, min=1, max=Integer.MAX_VALUE, com="VRAM buffer size (MB). 512 seems to be a good value on Normal render distance. Increase this if you encounter warnings about the VRAM getting full. Does not affect RAM usage.")
-    public static ConfigIntegerChangeCallback VRAMSize = new ConfigIntegerChangeCallback("VRAMSize", 512, 256, 2048, "VRAMSize");
+//    public static ConfigIntegerChangeCallback VRAMSize = new ConfigIntegerChangeCallback("VRAMSize", 512, 256, 2048, "VRAMSize");
 
     // @ConfigEnum(cat="render", def="auto", clazz=AutomatableBoolean.class, com="Render fog? Slightly reduces framerate. `auto` means the OpenGL setting will be respected (as set by mods like OptiFine).\nValid values: true, false, auto")
     public static ConfigBoolean renderFog = new ConfigBoolean("renderFog", true, "renderFog");
@@ -95,7 +101,7 @@ public class NeodymiumConfig extends SimpleConfigs {
     public static void init() {
         _general = List.of(enabled);
         render = List.of(simplifyChunkMeshes, cullFaces, shortUV, sortFrequency, fogOcclusion, fogOcclusionWithoutFog,
-                VRAMSize, renderFog, maxUnalignedQuadDistance);
+                bufferSizePass0, bufferSizePass1, renderFog, maxUnalignedQuadDistance);
         misc = List.of(replaceOpenGLSplash, ignoreIncompatibilities, silenceErrors);
         debug = List.of(maxMeshesPerFrame, showDebugInfo, wireframe, enableVanillaChunkMeshes);
 

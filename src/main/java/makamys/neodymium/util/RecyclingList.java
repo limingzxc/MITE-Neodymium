@@ -13,7 +13,7 @@ public class RecyclingList<T> {
     
     public RecyclingList(Supplier<T> constructor) {
         this.constructor = constructor;
-        this.list = new ArrayList<>();
+        this.list = new ArrayList<T>();
     }
     
     public T get(int i) {

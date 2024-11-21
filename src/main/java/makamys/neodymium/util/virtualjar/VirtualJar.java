@@ -15,10 +15,11 @@ import static makamys.neodymium.Constants.LOGGER;
 
 import makamys.neodymium.Neodymium;
 import makamys.neodymium.util.virtualjar.protocol.neodymiumvirtualjar.Handler;
-import net.fabricmc.loader.launch.common.FabricLauncherBase;
-//import net.minecraft.launchwrapper.Launch;
 
-
+/**
+ * This class is used to register fake "virtual" jars and add them to LaunchClassLoader's class path. The contents of
+ * these jars are determined dynamically by the implementation of {@link IVirtualJar}, rather than a real file in the file system.
+ */
 public class VirtualJar {
     
     private static boolean registered;
@@ -31,7 +32,7 @@ public class VirtualJar {
         LOGGER.debug("Registering URL protocol handler: " + PROTOCOL);
         
         // We want the Handler to always be loaded by the same class loader.
-//        Launch.classLoader.addClassLoaderExclusion("makamys." + MODID + ".util.virtualjar.protocol." + PROTOCOL);
+//        Launch.classLoader.addClassLoaderExclusion(getPackage() + ".protocol." + PROTOCOL + ".");
         
         // The Handler is loaded by the AppClassLoader, but it needs to access the state of VirtualJar, which is loaded
         // by the LaunchClassLoader. The solution? Make the Handler just a proxy that delegates the real work to
@@ -41,6 +42,11 @@ public class VirtualJar {
         URLStreamHandlerHelper.register(Handler.class);
         
         registered = true;
+    }
+    
+    private static String getPackage() {
+        String name = VirtualJar.class.getName();
+        return name.substring(0, name.lastIndexOf('.'));
     }
     
     public static void add(IVirtualJar jar) {
@@ -53,8 +59,8 @@ public class VirtualJar {
         try {
             URL url = new URL(urlStr);
 //            Launch.classLoader.addURL(url);
-//            // Forge expects all URLs in the sources list to be convertible to File objects, so we must remove it to
-//            // avoid a crash.
+            // Forge expects all URLs in the sources list to be convertible to File objects, so we must remove it to
+            // avoid a crash.
 //            Launch.classLoader.getSources().remove(url);
             
             jars.put(jar.getName(), jar);

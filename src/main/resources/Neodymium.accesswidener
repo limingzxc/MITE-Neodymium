@@ -3,3 +3,12 @@ extendable class net/minecraft/WorldRenderer
 accessible field net/minecraft/WorldRenderer posX I
 accessible field net/minecraft/WorldRenderer posY I
 accessible field net/minecraft/WorldRenderer posZ I
+accessible field net/minecraft/PlayerControllerMP netClientHandler Lnet/minecraft/NetClientHandler;
+accessible field net/minecraft/NetClientHandler doneLoadingTerrain Z
+accessible field net/minecraft/RenderGlobal sortedWorldRenderers [Lnet/minecraft/WorldRenderer;
+accessible field net/minecraft/RenderGlobal renderersLoaded I
+accessible field net/minecraft/RenderGlobal renderersSkippingRenderPass I
+accessible field net/minecraft/RenderGlobal renderersBeingClipped I
+accessible field net/minecraft/RenderGlobal occlusionEnabled Z
+accessible field net/minecraft/RenderGlobal renderersBeingOccluded I
+accessible field net/minecraft/RenderGlobal renderersBeingRendered I

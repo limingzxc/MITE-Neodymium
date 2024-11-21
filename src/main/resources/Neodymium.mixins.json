@@ -4,20 +4,8 @@
   "required": true,
   "target": "DEFAULT",
   "minVersion": "0.8.3",
-  "mixins": [
-    "EntityRendererMixin",
-    "MinecraftMixin",
-    "MixinGuiMainMenu",
-    "MixinRenderGlobal",
-    "MixinTessellatorMITE",
-    "MixinWorldRenderer",
-    "NetClientHandlerAccessor",
-    "PlayerControllerMPAccessor",
-    "PlayerUsageSnooperAccessor",
-    "ServerCommandManagerMixin",
-    "ServerConfigurationManagerAccessor",
-    "TessellatorAccessor"
-  ],
+  "mixins": [],
+  "plugin": "makamys.neodymium.MixinConfigPlugin",
   "injectors": {
     "defaultRequire": 1,
     "maxShiftBy": 5
