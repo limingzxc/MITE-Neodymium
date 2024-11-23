@@ -1,7 +1,5 @@
 package makamys.neodymium;
 
-import makamys.neodymium.Compat;
-import makamys.neodymium.config.NeodymiumConfig;
 import net.xiaoyu233.fml.FishModLoader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
@@ -19,12 +17,12 @@ public class MixinConfigPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
-        if(MixinEnvironment.getCurrentEnvironment().getSide() == Side.SERVER) return;
-
-        Phase phase = MixinEnvironment.getCurrentEnvironment().getPhase();
-        if(phase == Phase.INIT) {
-            Compat.forceEnableOptiFineDetectionOfFastCraft();
-        }
+//        if(MixinEnvironment.getCurrentEnvironment().getSide() == Side.SERVER) return;
+//
+//        Phase phase = MixinEnvironment.getCurrentEnvironment().getPhase();
+//        if(phase == Phase.INIT) {
+//            Compat.forceEnableOptiFineDetectionOfFastCraft();
+//        }
     }
 
     @Override
@@ -52,16 +50,13 @@ public class MixinConfigPlugin implements IMixinConfigPlugin {
             mixins.add("MixinRenderGlobal");
             mixins.add("MixinWorldRenderer");
             mixins.add("ServerCommandManagerMixin");
+            mixins.add("MixinGuiMainMenu");
 
             if (FishModLoader.hasMod("shader-loader")) {
                 System.out.println("Detected Shader Loader");
                 mixins.add("MixinTessellator");
             } else {
                 mixins.add("TessellatorMITEMixin");
-            }
-
-            if(NeodymiumConfig.replaceOpenGLSplash.getBooleanValue()) {
-                mixins.add("MixinGuiMainMenu");
             }
         }
 

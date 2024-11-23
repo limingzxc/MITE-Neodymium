@@ -2,6 +2,8 @@ package makamys.neodymium.mixin;
 
 import makamys.neodymium.Compat;
 import makamys.neodymium.Neodymium;
+import net.minecraft.Minecraft;
+import org.lwjgl.opengl.GL11;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -40,7 +42,7 @@ public abstract class MixinRenderGlobal {
     public void preRenderSortedRenderers(int startRenderer, int numRenderers, int renderPass, double partialTickTime, CallbackInfoReturnable<Integer> cir) {
         if(Neodymium.isActive()) {
             int updated = Neodymium.renderer.preRenderSortedRenderers(renderPass, partialTickTime, sortedWorldRenderers);
-            if(!Compat.keepRenderListLogic()) {
+            if (!Compat.keepRenderListLogic()) {
                 cir.setReturnValue(updated);
             }
         }
@@ -50,9 +52,9 @@ public abstract class MixinRenderGlobal {
             at = @At(value = "HEAD"),
             require = 1)
     public void preLoadRenderers(CallbackInfo ci) {
-        if (Compat.isOptiFineShadersEnabled()) {
+//        if (Compat.isOptiFineShadersEnabled()) {
             Neodymium.destroyRenderer();
-        }
+//        }
     }
     
     @Inject(method = "updateRenderers",

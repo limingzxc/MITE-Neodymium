@@ -22,9 +22,9 @@ public class Compat {
     
     private static boolean wasAdvancedOpenGLEnabled;
     
-    private static boolean IS_RPLE_PRESENT;
+    private static boolean IS_RPLE_PRESENT = false;
 
-    private static boolean IS_FALSE_TWEAKS_PRESENT;
+    private static boolean IS_FALSE_TWEAKS_PRESENT = false;
 
     private static boolean IS_HODGEPODGE_SPEEDUP_ANIMATIONS_ENABLED;
     private static boolean IS_ANGELICA_SPEEDUP_ANIMATIONS_ENABLED;

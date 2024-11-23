@@ -217,7 +217,7 @@ public abstract class MixinWorldRenderer implements NeodymiumWorldRenderer {
             require = 1)
     private void preSetDontDraw(CallbackInfo ci) {
         if(Neodymium.isActive()) {
-            Neodymium.renderer.onWorldRendererChanged((WorldRenderer) (Object) this, NeoRenderer.WorldRendererChange.DELETED);
+            Neodymium.renderer.onWorldRendererChanged(WorldRenderer.class.cast(this), NeoRenderer.WorldRendererChange.DELETED);
         }
     }
 

@@ -1,6 +1,5 @@
 package makamys.neodymium.renderer.compat;
 
-import makamys.neodymium.config.NeodymiumConfig;
 import makamys.neodymium.renderer.ChunkMesh;
 import makamys.neodymium.renderer.attribs.AttributeSet;
 import makamys.neodymium.util.BufferWriter;
@@ -11,12 +10,10 @@ import org.lwjgl.opengl.ARBVertexShader;
 import static makamys.neodymium.renderer.MeshPolygon.DEFAULT_BRIGHTNESS;
 import static makamys.neodymium.renderer.MeshPolygon.DEFAULT_COLOR;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL11.GL_FLOAT;
-import static org.lwjgl.opengl.GL11.GL_SHORT;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
-import static org.lwjgl.opengl.GL13.*;
-import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE3;
+import static org.lwjgl.opengl.GL13.glClientActiveTexture;
+import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
+import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 
 public class RenderUtilShaders implements RenderUtil {
     public static final RenderUtilShaders INSTANCE = new RenderUtilShaders();
