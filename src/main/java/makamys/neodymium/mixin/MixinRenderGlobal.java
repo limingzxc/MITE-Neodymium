@@ -2,8 +2,9 @@ package makamys.neodymium.mixin;
 
 import makamys.neodymium.Compat;
 import makamys.neodymium.Neodymium;
-import net.minecraft.Minecraft;
-import org.lwjgl.opengl.GL11;
+import net.minecraft.EntityLivingBase;
+import net.minecraft.RenderGlobal;
+import net.minecraft.WorldRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -11,10 +12,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import net.minecraft.RenderGlobal;
-import net.minecraft.WorldRenderer;
-import net.minecraft.EntityLivingBase;
 
 /** Blocks vanilla chunk rendering while NeoRenderer is active. */
 @Mixin(RenderGlobal.class)

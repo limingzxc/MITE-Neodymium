@@ -144,7 +144,7 @@ public class NeoRenderer {
         final EntityLivingBase rve = Minecraft.getMinecraft().renderViewEntity;
 
         eyePosX = rve.lastTickPosX + (rve.posX - rve.lastTickPosX) * alpha;
-        eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + rve.getEyeHeight();
+        eyePosY = rve.lastTickPosY + (rve.posY - rve.lastTickPosY) * alpha + 0.12F /*rve.getEyeHeight()*/;
         eyePosZ = rve.lastTickPosZ + (rve.posZ - rve.lastTickPosZ) * alpha;
 
         eyePosXT = eyePosX + transformedOrigin.x;
