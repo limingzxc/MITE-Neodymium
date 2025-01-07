@@ -53,7 +53,7 @@ public class Compat {
 //        } catch (IOException e) {
 //            IS_SHADERS_MOD_PRESENT = false;
 //        }
-        IS_SHADERS_MOD_PRESENT = FishModLoader.hasMod("shader-loader");
+        IS_SHADERS_MOD_PRESENT = FishModLoader.hasMod("shader-loader") || FishModLoader.hasMod("shaders_mod_core");
 
         IS_HODGEPODGE_SPEEDUP_ANIMATIONS_ENABLED = checkIfHodgepodgeSpeedupAnimationsIsEnabled();
         IS_ANGELICA_SPEEDUP_ANIMATIONS_ENABLED = checkIfAngelicaSpeedupAnimationsIsEnabled();
@@ -155,7 +155,7 @@ public class Compat {
         if (!IS_SHADERS_MOD_PRESENT)
             return;
 
-        String packName = net.wenscHuix.mitemod.shader.client.Shaders.shadersConfig.getProperty("shaderPack");
+        String packName = shadersmodcore.client.shader.Shaders.shadersConfig.getProperty("shaderPack");
         if (!packName.isEmpty()) {
             isShadersEnabled = true;
         }
@@ -165,7 +165,7 @@ public class Compat {
         if (!IS_SHADERS_MOD_PRESENT)
             return false;
 
-        return net.wenscHuix.mitemod.shader.client.Shaders.isShadowPass;
+        return shadersmodcore.client.shader.Shaders.isShadowPass;
     }
 
     public static void getCompatibilityWarnings(List<Warning> warns, List<Warning> criticalWarns, boolean statusCommand){
