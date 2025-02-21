@@ -84,7 +84,6 @@ jar {
 	from("LICENSE") {
 		rename { "${it}_${project.base.archivesName.get()}"}
 	}
-	from("$projectDir/libs/trove-3.0.3.jar")
 }
 
 // configure the maven publication

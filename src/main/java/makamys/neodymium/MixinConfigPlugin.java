@@ -55,6 +55,7 @@ public class MixinConfigPlugin implements IMixinConfigPlugin {
             if (FishModLoader.hasMod("shaders_mod_core")) {
                 System.out.println("Detected Shaders Mod Core");
                 mixins.add("MixinTessellator");
+                mixins.add("RenderGlobalMixin");
             } else {
                 mixins.add("TessellatorMITEMixin");
             }
